@@ -65,6 +65,8 @@ func _make_shared_materials() -> void:
 	_wood_mat.uv1_triplanar = true
 	_wood_mat.uv1_scale = Vector3(3, 3, 3)
 	_wood_mat.roughness = 0.85
+	# Hand-built hull quads have mixed winding — never cull them.
+	_wood_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	_sail_mat = StandardMaterial3D.new()
 	_sail_mat.albedo_color = COLOR_SAIL
@@ -556,6 +558,7 @@ func _flat_material(c: Color, unshaded := false) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
 	m.roughness = 0.8
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	if unshaded:
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return m
