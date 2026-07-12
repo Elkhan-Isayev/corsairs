@@ -1,0 +1,7 @@
+# Godot
+.godot/
+build/
+*.tmp
+
+# macOS
+.DS_Store
