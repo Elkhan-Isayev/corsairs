@@ -1,4 +1,5 @@
-## Archipelago map: islands, wind, voyages between colonies.
+## Archipelago map styled as a sea chart: procedural island shapes,
+## textured water, a compass rose. Click an island to sail there.
 extends Control
 
 const World := preload("res://core/world.gd")
@@ -12,16 +13,22 @@ var _map_area: Control
 
 
 func _ready() -> void:
-	var bg := ColorRect.new()
-	bg.color = Color("123a5c")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	_build_ocean()
+
+	var top_panel := PanelContainer.new()
+	top_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	var top_style := StyleBoxFlat.new()
+	top_style.bg_color = Color(0.04, 0.09, 0.14, 0.85)
+	top_style.content_margin_left = 12
+	top_style.content_margin_right = 12
+	top_style.content_margin_top = 6
+	top_style.content_margin_bottom = 6
+	top_panel.add_theme_stylebox_override("panel", top_style)
+	add_child(top_panel)
 
 	var top := HBoxContainer.new()
-	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.offset_bottom = 40
 	top.add_theme_constant_override("separation", 24)
-	add_child(top)
+	top_panel.add_child(top)
 
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", Color("e8c872"))
@@ -43,16 +50,51 @@ func _ready() -> void:
 	_map_area.offset_bottom = -140
 	add_child(_map_area)
 
+	var log_panel := PanelContainer.new()
+	log_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	log_panel.offset_top = -132
+	var log_style := StyleBoxFlat.new()
+	log_style.bg_color = Color(0.04, 0.09, 0.14, 0.8)
+	log_style.content_margin_left = 12
+	log_style.content_margin_top = 8
+	log_panel.add_theme_stylebox_override("panel", log_style)
+	add_child(log_panel)
+
 	_log_label = RichTextLabel.new()
-	_log_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_log_label.offset_top = -132
 	_log_label.bbcode_enabled = true
 	_log_label.add_theme_color_override("default_color", Color("cfe3f5"))
-	add_child(_log_label)
+	log_panel.add_child(_log_label)
 
 	_build_islands()
 	_refresh_status()
 	_show_last_log()
+
+
+## Layered ocean: deep base + two scrolling-scale noise textures.
+func _build_ocean() -> void:
+	var base := ColorRect.new()
+	base.color = Color("0e3963")
+	base.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(base)
+
+	for layer in [
+		{"freq": 0.004, "modulate": Color(0.35, 0.62, 0.85, 0.30)},
+		{"freq": 0.015, "modulate": Color(0.55, 0.80, 0.95, 0.12)},
+	]:
+		var noise := FastNoiseLite.new()
+		noise.frequency = layer["freq"]
+		noise.fractal_octaves = 3
+		var ntex := NoiseTexture2D.new()
+		ntex.noise = noise
+		ntex.seamless = true
+		ntex.width = 512
+		ntex.height = 512
+		var tr := TextureRect.new()
+		tr.texture = ntex
+		tr.stretch_mode = TextureRect.STRETCH_TILE
+		tr.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tr.modulate = layer["modulate"]
+		add_child(tr)
 
 
 func _map_to_screen(pos: Array) -> Vector2:
@@ -66,21 +108,78 @@ func _build_islands() -> void:
 	await get_tree().process_frame  # wait for layout so the area size is known
 	for id in World.island_ids():
 		var isl := World.island(id)
-		var btn := Button.new()
+		var center := _map_to_screen(isl["pos"])
 		var here: bool = Game.state.current_island == id
 		var closed: bool = Game.state.world.is_port_hostile(id)
-		var nation_name: String = World.NATIONS[isl["nation"]]["name"]
-		btn.text = "%s%s\n(%s)%s" % ["⚓ " if here else "", isl["name"], nation_name, "  ✖" if closed else ""]
-		btn.position = _map_to_screen(isl["pos"]) - Vector2(60, 20)
-		btn.custom_minimum_size = Vector2(120, 48)
-		# The pirate brand color is near-black — use grey on the dark map.
-		var text_color := Color(World.NATIONS[isl["nation"]]["color"])
-		if isl["nation"] == "pirates":
-			text_color = Color("b0bec5")
-		btn.add_theme_color_override("font_color", text_color)
-		btn.disabled = here
-		btn.pressed.connect(_on_island_clicked.bind(id))
-		_map_area.add_child(btn)
+		_draw_island_shape(id, center, int(isl["tier"]))
+		_place_island_label(id, isl, center, here, closed)
+	_add_compass_rose()
+
+
+## Irregular island blob: shoal ring, beach, land, highland.
+func _draw_island_shape(id: String, center: Vector2, tier: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(id)
+	var base_r := 26.0 + tier * 9.0
+	var points := PackedVector2Array()
+	var n := 14
+	for i in n:
+		var ang := float(i) / n * TAU
+		var r := base_r * (0.72 + rng.randf() * 0.55)
+		points.append(Vector2(cos(ang), sin(ang) * 0.8) * r)
+
+	var layers := [
+		{"scale": 1.45, "color": Color(0.45, 0.78, 0.82, 0.35)},  # shoal water
+		{"scale": 1.14, "color": Color("cbb182")},                 # beach
+		{"scale": 1.0, "color": Color("4d7c44")},                  # land
+		{"scale": 0.52, "color": Color("3a6234")},                 # highland
+	]
+	for layer in layers:
+		var poly := Polygon2D.new()
+		var scaled := PackedVector2Array()
+		for p in points:
+			scaled.append(p * layer["scale"])
+		poly.polygon = scaled
+		poly.color = layer["color"]
+		poly.position = center
+		_map_area.add_child(poly)
+
+
+func _place_island_label(id: String, isl: Dictionary, center: Vector2, here: bool, closed: bool) -> void:
+	var btn := Button.new()
+	var nation_name: String = World.NATIONS[isl["nation"]]["name"]
+	btn.text = "%s%s (%s)%s" % ["⚓ " if here else "", isl["name"], nation_name, "  ✖" if closed else ""]
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.07, 0.11, 0.75)
+	style.border_color = Color("e8c87255")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 3
+	style.content_margin_bottom = 3
+	btn.add_theme_stylebox_override("normal", style)
+	var hover := style.duplicate()
+	hover.bg_color = Color(0.10, 0.18, 0.26, 0.9)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", hover)
+	var text_color := Color(World.NATIONS[isl["nation"]]["color"]).lightened(0.35)
+	if isl["nation"] == "pirates":
+		text_color = Color("b0bec5")
+	btn.add_theme_color_override("font_color", text_color)
+	btn.add_theme_color_override("font_hover_color", text_color.lightened(0.2))
+	btn.disabled = here
+	btn.pressed.connect(_on_island_clicked.bind(id))
+	_map_area.add_child(btn)
+	# Center the label under the island blob.
+	await get_tree().process_frame
+	btn.position = center + Vector2(-btn.size.x / 2.0, 30.0 + isl["tier"] * 9.0)
+
+
+func _add_compass_rose() -> void:
+	var rose := CompassRose.new()
+	rose.position = Vector2(_map_area.size.x - 120, 110)
+	_map_area.add_child(rose)
 
 
 func _refresh_status() -> void:
@@ -116,3 +215,23 @@ func _on_island_clicked(id: String) -> void:
 	if not battle:
 		# Redraw the map on arrival.
 		get_tree().reload_current_scene()
+
+
+## A 8-point compass rose drawn with polygons.
+class CompassRose extends Control:
+	func _draw() -> void:
+		var r := 70.0
+		draw_circle(Vector2.ZERO, r + 8, Color(0.03, 0.07, 0.11, 0.55))
+		draw_arc(Vector2.ZERO, r + 4, 0, TAU, 64, Color("e8c872"), 2.0)
+		draw_arc(Vector2.ZERO, r - 16, 0, TAU, 64, Color("e8c87288"), 1.0)
+		for i in 8:
+			var ang := float(i) / 8.0 * TAU - PI / 2.0
+			var tip := Vector2(cos(ang), sin(ang)) * (r if i % 2 == 0 else r * 0.62)
+			var left := Vector2(cos(ang - 0.16), sin(ang - 0.16)) * r * 0.16
+			var right := Vector2(cos(ang + 0.16), sin(ang + 0.16)) * r * 0.16
+			draw_colored_polygon(PackedVector2Array([tip, left, Vector2.ZERO]), Color("e8c872"))
+			draw_colored_polygon(PackedVector2Array([tip, Vector2.ZERO, right]), Color("8a6a3f"))
+		var font := ThemeDB.fallback_font
+		var labels := {"N": Vector2(0, -r - 14), "E": Vector2(r + 8, 0), "S": Vector2(0, r + 20), "W": Vector2(-r - 20, 0)}
+		for t in labels:
+			draw_string(font, labels[t] + Vector2(-5, 5), t, HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color("e8c872"))

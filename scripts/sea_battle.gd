@@ -49,41 +49,72 @@ func _ready() -> void:
 
 
 func _build_environment() -> void:
+	# Late-afternoon sun: warm, low, with a visible disc in the sky.
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-45, -30, 0)
-	sun.light_energy = 1.3
+	sun.rotation_degrees = Vector3(-24, 55, 0)
+	sun.light_energy = 1.5
+	sun.light_color = Color(1.0, 0.87, 0.68)
 	add_child(sun)
+
+	var fill := DirectionalLight3D.new()
+	fill.rotation_degrees = Vector3(-60, -120, 0)
+	fill.light_energy = 0.25
+	fill.light_color = Color(0.65, 0.75, 0.95)
+	add_child(fill)
 
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("2e6a9e")
-	sky_mat.sky_horizon_color = Color("b8d4e8")
+	sky_mat.sky_top_color = Color("27548c")
+	sky_mat.sky_horizon_color = Color("e8cfa8")
+	sky_mat.sky_curve = 0.12
 	sky_mat.ground_bottom_color = Color("0a2438")
-	sky_mat.ground_horizon_color = Color("b8d4e8")
+	sky_mat.ground_horizon_color = Color("d8c4a0")
+	sky_mat.sun_angle_max = 30.0
+	sky_mat.sun_curve = 0.08
 	sky.sky_material = sky_mat
 	e.background_mode = Environment.BG_SKY
 	e.sky = sky
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES
+	e.tonemap_exposure = 1.05
+	e.glow_enabled = true
+	e.glow_intensity = 0.5
+	e.glow_bloom = 0.08
+	e.adjustment_enabled = true
+	e.adjustment_saturation = 1.12
+	e.adjustment_contrast = 1.04
 	e.fog_enabled = true
-	e.fog_light_color = Color("b8d4e8")
-	e.fog_density = 0.0004
+	e.fog_light_color = Color("d9c6a4")
+	e.fog_density = 0.0005
+	e.fog_sky_affect = 0.2
 	env.environment = e
 	add_child(env)
 
 	var water := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(4000, 4000)
-	plane.subdivide_width = 120
-	plane.subdivide_depth = 120
+	plane.subdivide_width = 160
+	plane.subdivide_depth = 160
 	water.mesh = plane
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://assets/water.gdshader")
+	# Seamless procedural noise drives both the chop and the ripple normals.
+	var noise := FastNoiseLite.new()
+	noise.frequency = 0.008
+	noise.fractal_octaves = 4
+	var ntex := NoiseTexture2D.new()
+	ntex.noise = noise
+	ntex.seamless = true
+	ntex.width = 512
+	ntex.height = 512
+	mat.set_shader_parameter("noise_tex", ntex)
 	water.material_override = mat
 	add_child(water)
 
 	camera = Camera3D.new()
 	camera.far = 6000.0
+	camera.fov = 60.0
 	add_child(camera)
 
 
@@ -183,6 +214,7 @@ func _physics_process(delta: float) -> void:
 	_move_ship(player_node, player_ship.heading, p_speed, delta)
 	player_node.set_sail_amount(player_ship.sail_setting)
 	player_node.bob(_time, 0.0)
+	player_node.set_speed_visual(p_speed)
 	Combat.tick_reload(player_ship, delta, cann)
 
 	# --- Player fire ---
@@ -290,6 +322,7 @@ func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
 	_move_ship(enemy_node, enemy_heading, e_speed, delta)
 	enemy_node.set_sail_amount(enemy_ship.sail_setting)
 	enemy_node.bob(_time, 2.1)
+	enemy_node.set_speed_visual(e_speed)
 	Combat.tick_reload(enemy_ship, delta, 3)
 
 	# Ammo choice: far — cannonballs; close with a crew advantage — grapeshot.
