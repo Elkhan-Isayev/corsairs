@@ -27,21 +27,25 @@ func _process(_delta: float) -> bool:
 			game.state = load("res://core/game_state.gd").new_game("Smoke", "england", 99)
 			change_scene_to_file("res://scenes/port.tscn")
 		2:
-			_expect(current_scene != null and current_scene.name == "Port", "port opened")
-			change_scene_to_file("res://scenes/world_map.tscn")
+			_expect(current_scene != null and current_scene.name == "Port", "port UI opened")
+			change_scene_to_file("res://scenes/port_town.tscn")
 		3:
+			_expect(current_scene != null and current_scene.name == "PortTown", "port town opened")
+			_expect(current_scene.player != null, "town player built")
+			change_scene_to_file("res://scenes/world_map.tscn")
+		4:
 			_expect(current_scene != null and current_scene.name == "WorldMap", "map opened")
 			game.pending_encounter = {"nation": "pirates", "ship_type": "sloop", "hostile": true}
 			change_scene_to_file("res://scenes/sea.tscn")
-		4:
+		5:
 			_expect(current_scene != null and current_scene.name == "SeaBattle", "sea battle started")
 			var battle = current_scene
 			_expect(battle.enemy_ship != null, "enemy created")
 			_expect(battle.player_node != null, "player ship built")
-		5:
+		6:
 			# Let the battle physics run a couple more seconds.
 			pass
-		6:
+		7:
 			for e in _errors:
 				print("FAIL: %s" % e)
 			print("SMOKE %s" % ("PASSED" if _errors.is_empty() else "FAILED"))

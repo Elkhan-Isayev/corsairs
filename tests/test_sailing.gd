@@ -4,9 +4,11 @@ const Ship := preload("res://core/ship.gd")
 const Sailing := preload("res://core/sailing.gd")
 
 
-func test_wind_profile_dead_zone() -> void:
-	assert_almost_eq(Sailing.wind_profile(0.0), 0.1, 0.01, "nearly dead in irons")
-	assert_almost_eq(Sailing.wind_profile(20.0), 0.1, 0.01)
+func test_wind_profile_arcade_never_stalls() -> void:
+	# Arcade model: even dead upwind the ship keeps at least 75% speed.
+	assert_almost_eq(Sailing.wind_profile(0.0), 0.75, 0.01, "mild upwind penalty")
+	for a in range(0, 181, 10):
+		assert_between(Sailing.wind_profile(a), 0.75, 1.0, "angle %d" % a)
 
 
 func test_wind_profile_best_at_broad_reach() -> void:
@@ -33,6 +35,24 @@ func test_speed_full_sails_downwind() -> void:
 	s.heading = 135.0  # wind from the north, sailing on a broad reach
 	var v := Sailing.ship_speed(s, 0.0, 10.0, 0)
 	assert_almost_eq(v, 12.5, 0.1, "full speed on a broad reach in a 10-knot wind")
+
+
+func test_wind_strength_barely_matters() -> void:
+	# Arcade: a near-calm and a gale differ by no more than ~20%.
+	var s = Ship.create("lugger")
+	s.sail_setting = 1.0
+	s.heading = 135.0
+	var calm := Sailing.ship_speed(s, 0.0, 2.0, 0)
+	var gale := Sailing.ship_speed(s, 0.0, 15.0, 0)
+	assert_gt(calm, gale * 0.8, "calm keeps at least 80%% of gale speed")
+
+
+func test_upwind_still_sails_fast() -> void:
+	var s = Ship.create("lugger")
+	s.sail_setting = 1.0
+	s.heading = 0.0  # dead upwind
+	var v := Sailing.ship_speed(s, 0.0, 10.0, 0)
+	assert_gt(v, 12.5 * 0.7, "upwind course keeps a normal arcade speed")
 
 
 func test_speed_drops_with_torn_sails() -> void:

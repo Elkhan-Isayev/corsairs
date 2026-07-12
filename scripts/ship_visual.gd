@@ -18,6 +18,7 @@ var length := 30.0
 var flag_color := Color("c62828")
 
 var _sails: Array = []   # pivots scaled to furl/unfurl
+var _crew: Array = []    # wandering deck sailors: {node, target, speed}
 var _flag: MeshInstance3D
 var _wake: MeshInstance3D
 var _wake_mat: StandardMaterial3D
@@ -42,8 +43,10 @@ func build(p_length: float, p_flag: Color) -> void:
 	_build_bulwark_and_strakes()
 	_build_decks_and_stern()
 	_build_cannons()
+	_build_deck_guns()
 	_build_masts()
 	_build_bowsprit_and_jibs()
+	_build_crew()
 	_build_wake()
 
 
@@ -278,6 +281,75 @@ func _build_cannons() -> void:
 			_box(Vector3(0.10, length * 0.026, length * 0.026), Vector3(side * x * 1.005, y, z), Color("0d0905"))
 			var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
 			barrel.rotation_degrees = Vector3(0, 0, 90)
+
+
+## Carriage guns standing on the open deck, barrels out over the rail.
+func _build_deck_guns() -> void:
+	var n := clampi(int(length / 8.0), 2, 5)
+	for side in [-1.0, 1.0]:
+		for i in n:
+			var t := 0.34 + float(i) / n * 0.34
+			var z := -length / 2.0 + t * length
+			var deck := _deck_y(t)
+			var x: float = _half_width(t) * 0.66 * side
+			# Carriage.
+			_box(Vector3(0.6, 0.35, 0.9), Vector3(x, deck + 0.30, z), Color("4a2e15"))
+			# Wheels.
+			for dz in [-0.3, 0.3]:
+				var wheel := _cylinder(0.16, 0.16, 0.12, Vector3(x, deck + 0.16, z + dz), Color("2a1a0c"))
+				wheel.rotation_degrees = Vector3(0, 0, 90)
+			# Barrel pointing out over the side.
+			var barrel := _cylinder(0.10, 0.14, 1.5, Vector3(x + side * 0.55, deck + 0.55, z), Color("15130f"))
+			barrel.rotation_degrees = Vector3(0, 0, side * 80.0)
+
+
+## Little sailors wandering the deck (animated in _process).
+func _build_crew() -> void:
+	var count := clampi(3 + int(length / 8.0), 4, 10)
+	var shirt_colors := [Color("e8e2d0"), Color("8d3a2e"), Color("35405c"), Color("6b7d4a")]
+	for i in count:
+		var sailor := Node3D.new()
+		_root.add_child(sailor)
+		var body := MeshInstance3D.new()
+		var cm := CapsuleMesh.new()
+		cm.radius = 0.20
+		cm.height = 1.0
+		body.mesh = cm
+		body.position = Vector3(0, 0.5, 0)
+		body.material_override = _flat_material(shirt_colors[i % shirt_colors.size()])
+		sailor.add_child(body)
+		var head := MeshInstance3D.new()
+		var hm := SphereMesh.new()
+		hm.radius = 0.16
+		hm.height = 0.32
+		head.mesh = hm
+		head.position = Vector3(0, 1.15, 0)
+		head.material_override = _flat_material(Color("d9a97a"))
+		sailor.add_child(head)
+		var spot := _crew_spot()
+		sailor.position = spot
+		_crew.append({"node": sailor, "target": _crew_spot(), "speed": randf_range(1.0, 2.0)})
+	set_process(true)
+
+
+func _crew_spot() -> Vector3:
+	var t := randf_range(0.22, 0.70)
+	var z := -length / 2.0 + t * length
+	var x := randf_range(-1.0, 1.0) * _half_width(t) * 0.55
+	return Vector3(x, _deck_y(t) + 0.05, z)
+
+
+func _process(delta: float) -> void:
+	for s in _crew:
+		var node: Node3D = s["node"]
+		var target: Vector3 = s["target"]
+		var to_target := target - node.position
+		if to_target.length() < 0.3:
+			s["target"] = _crew_spot()
+			continue
+		var step: Vector3 = to_target.normalized() * s["speed"] * delta
+		node.position += step
+		node.rotation.y = atan2(-step.x, -step.z)
 
 
 # --- Masts, sails, rigging ---

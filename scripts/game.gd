@@ -8,6 +8,8 @@ var state: RefCounted = null
 var pending_encounter: Dictionary = {}
 ## Log of the last voyage (shown on the map).
 var last_sail_log: Dictionary = {}
+## Tab the port UI should open on (-1 = keep last).
+var port_tab: int = -1
 
 
 func new_game(captain_name: String, nation: String) -> void:
@@ -38,7 +40,14 @@ func goto_map() -> void:
 	get_tree().change_scene_to_file("res://scenes/world_map.tscn")
 
 
+## The walkable 3D town — the default view when in a port.
 func goto_port() -> void:
+	get_tree().change_scene_to_file("res://scenes/port_town.tscn")
+
+
+## The port menu UI (tabs); tab -1 keeps the last one open.
+func goto_port_ui(tab: int = -1) -> void:
+	port_tab = tab
 	get_tree().change_scene_to_file("res://scenes/port.tscn")
 
 

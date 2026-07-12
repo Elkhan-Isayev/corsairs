@@ -59,13 +59,20 @@ func _rebuild() -> void:
 		s.ship.custom_name, int(s.ship.hull_frac() * 100), s.ship.crew, s.ship.spec()["max_crew"]]
 
 	var current_tab := _tabs.current_tab
+	# Detach old tabs immediately so new ones don't get @-mangled names.
 	for c in _tabs.get_children():
+		_tabs.remove_child(c)
 		c.queue_free()
 	_tabs.add_child(_build_port_tab())
 	_tabs.add_child(_build_market_tab())
 	_tabs.add_child(_build_shipyard_tab())
 	_tabs.add_child(_build_captain_tab())
-	if current_tab >= 0 and current_tab < 4:
+	for i in 4:
+		_tabs.set_tab_title(i, ["Port", "Market", "Shipyard", "Captain"][i])
+	if Game.port_tab >= 0:
+		_tabs.current_tab = Game.port_tab
+		Game.port_tab = -1
+	elif current_tab >= 0 and current_tab < 4:
 		_tabs.current_tab = maxi(current_tab, 0)
 
 
@@ -100,6 +107,11 @@ func _build_port_tab() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	box.add_child(row)
+
+	var town := Button.new()
+	town.text = "🏘 Back to town"
+	town.pressed.connect(func(): Game.goto_port())
+	row.add_child(town)
 
 	var sail := Button.new()
 	sail.text = "⚓ Set sail (map)"

@@ -9,7 +9,7 @@ const Ammo := preload("res://core/ammo.gd")
 const World := preload("res://core/world.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
 
-const SPEED_SCALE := 2.0      # knots -> m/s (sped up for pacing)
+const SPEED_SCALE := 2.6      # knots -> m/s (sped up for arcade pacing)
 const ESCAPE_DISTANCE := 1600.0
 
 var player_ship: RefCounted
@@ -62,6 +62,8 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-24, 55, 0)
 	sun.light_energy = 1.5
 	sun.light_color = Color(1.0, 0.87, 0.68)
+	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 400.0
 	add_child(sun)
 
 	var fill := DirectionalLight3D.new()

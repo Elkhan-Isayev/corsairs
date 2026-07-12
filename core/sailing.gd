@@ -4,18 +4,18 @@
 extends RefCounted
 
 ## Speed multiplier from the course angle to the wind (0° = dead upwind).
+## Arcade model: the wind flavors the speed but never stalls the ship —
+## the multiplier stays in a narrow 0.75..1.0 band.
 static func wind_profile(angle_to_wind_deg: float) -> float:
 	var a := absf(wrapf(angle_to_wind_deg, -180.0, 180.0))
-	if a < 30.0:      # in irons — dead zone
-		return 0.1
-	elif a < 60.0:    # close-hauled
-		return 0.45 + (a - 30.0) / 30.0 * 0.25   # 0.45..0.70
-	elif a < 90.0:    # close reach / beam reach
-		return 0.70 + (a - 60.0) / 30.0 * 0.20   # 0.70..0.90
+	if a < 30.0:      # upwind — mildest penalty instead of a dead zone
+		return 0.75
+	elif a < 90.0:    # close-hauled to beam reach
+		return 0.75 + (a - 30.0) / 60.0 * 0.17   # 0.75..0.92
 	elif a < 135.0:   # broad reach — the best point of sail
-		return 0.90 + (a - 90.0) / 45.0 * 0.10   # 0.90..1.00
-	else:             # running — slightly slower than a broad reach
-		return 1.0 - (a - 135.0) / 45.0 * 0.12   # 1.00..0.88
+		return 0.92 + (a - 90.0) / 45.0 * 0.08   # 0.92..1.00
+	else:             # running — barely slower than a broad reach
+		return 1.0 - (a - 135.0) / 45.0 * 0.04   # 1.00..0.96
 
 
 ## Resulting speed in knots.
@@ -28,7 +28,8 @@ static func ship_speed(ship, wind_from_deg: float, wind_strength: float, navigat
 	var profile := wind_profile(angle)
 	var sail_hp: float = ship.sails_frac()
 	var skill_bonus := 1.0 + navigation_skill * 0.02   # +2% per skill point
-	var wind_mult := clampf(wind_strength / 10.0, 0.2, 1.5)
+	# Arcade: wind strength nudges speed by ±10% at most.
+	var wind_mult := clampf(1.0 + (wind_strength - 10.0) * 0.01, 0.9, 1.1)
 	return base * ship.sail_setting * profile * sail_hp * wind_mult * skill_bonus
 
 

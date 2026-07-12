@@ -18,13 +18,13 @@ Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install need
 
 ## Screenshots
 
-| Sea battle | World map |
+| Sea battle | Port town (walkable 3D) |
 |---|---|
-| ![Sea battle](docs/screenshots/battle.png) | ![World map](docs/screenshots/map.png) |
+| ![Sea battle](docs/screenshots/battle.png) | ![Port town](docs/screenshots/town.png) |
 
-| Port & governor quests | Main menu |
+| World map | Port menu |
 |---|---|
-| ![Port](docs/screenshots/port.png) | ![Main menu](docs/screenshots/menu.png) |
+| ![World map](docs/screenshots/map.png) | ![Port menu](docs/screenshots/port.png) |
 
 ## Features
 
@@ -40,6 +40,9 @@ Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install need
 - ⛵ **Procedural square-riggers** — smooth rounded hulls with ochre gun strakes, three sail tiers, jibs, gaff spankers, shrouds with ratlines, cannons in the ports, glowing stern lanterns — all generated at runtime, no model files.
 - 🎵 **Procedurally synthesized soundtrack** — a calm sailing theme, a tense battle track, and ocean ambience, rendered to WAV by `tools/generate_music.gd` (no sampled audio).
 - 🎥 **Free orbit camera** in battle — drag with the right mouse button, zoom with the wheel.
+- 🏘️ **Walkable 3D port towns** — stroll the quay past your anchored ship, barrels and palms; enter the tavern, store, shipyard or the governor's mansion (E at the door). All procedural.
+- 🏃 **Living decks** — carriage guns and sailors wandering the deck of every ship.
+- 🕹️ **Arcade sailing** — the wind flavors your speed (±25% at most) but never stalls the ship; battles stay fast.
 
 ## Controls (sea battle)
 
