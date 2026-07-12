@@ -8,6 +8,12 @@ An open-source, **built-from-scratch** remake made with **Godot 4.7**, inspired 
 
 No original game assets are used — all code, game data, and "art" (procedural sailing ships, water shader) are written from zero.
 
+## 🎮 Play now
+
+[![PLAY IN BROWSER](https://img.shields.io/badge/%E2%96%B6%20PLAY%20IN%20BROWSER-elkhan--isayev.github.io%2Fcorsairs-2ea44f?style=for-the-badge)](https://elkhan-isayev.github.io/corsairs/)
+
+Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install needed, the web build is deployed to GitHub Pages automatically on every push.
+
 ---
 
 ## Screenshots
