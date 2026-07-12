@@ -14,6 +14,7 @@ config/features=PackedStringArray("4.7")
 [autoload]
 
 Game="*res://scripts/game.gd"
+Music="*res://scripts/music.gd"
 
 [display]
 

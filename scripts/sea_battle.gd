@@ -26,6 +26,12 @@ var camera: Camera3D
 var battle_over := false
 var _time := 0.0
 
+# Orbit camera (RMB drag to rotate, wheel to zoom).
+var cam_yaw := 0.0
+var cam_pitch := 18.0
+var cam_dist := 70.0
+var _orbiting := false
+
 # HUD
 var hud: CanvasLayer
 var lbl_player: Label
@@ -36,6 +42,7 @@ var bar_reload: ProgressBar
 
 
 func _ready() -> void:
+	Music.play_battle()
 	player_ship = Game.state.ship
 	var enc: Dictionary = Game.pending_encounter
 	enemy_ship = Game.state.spawn_encounter_ship(enc)
@@ -43,6 +50,7 @@ func _ready() -> void:
 	_build_environment()
 	_build_ships()
 	_build_hud()
+	_start_ocean_ambience()
 	_log("Enemy: %s \"%s\" (%s). Wind %d°." % [
 		enemy_ship.spec()["name"], enemy_ship.custom_name,
 		World.NATIONS[enemy_nation]["name"], int(Game.state.wind["from"])])
@@ -116,6 +124,32 @@ func _build_environment() -> void:
 	camera.far = 6000.0
 	camera.fov = 60.0
 	add_child(camera)
+
+
+func _start_ocean_ambience() -> void:
+	var waves := AudioStreamPlayer.new()
+	var stream: AudioStreamWAV = load("res://assets/music/waves.wav")
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = stream.data.size() / 2
+	waves.stream = stream
+	waves.volume_db = -10.0
+	add_child(waves)
+	waves.play()
+
+
+## RMB drag orbits the camera, the wheel zooms.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			_orbiting = event.pressed
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			cam_dist = clampf(cam_dist * 0.9, 30.0, 260.0)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			cam_dist = clampf(cam_dist * 1.1, 30.0, 260.0)
+	elif event is InputEventMouseMotion and _orbiting:
+		cam_yaw = wrapf(cam_yaw - event.relative.x * 0.35, 0.0, 360.0)
+		cam_pitch = clampf(cam_pitch + event.relative.y * 0.25, 4.0, 70.0)
 
 
 func _flag_color(nation: String) -> Color:
@@ -229,10 +263,12 @@ func _physics_process(delta: float) -> void:
 	# --- Enemy ---
 	_enemy_ai(delta, dist, wind)
 
-	# --- Camera ---
-	var back := Vector3(sin(deg_to_rad(player_ship.heading)), 0, -cos(deg_to_rad(player_ship.heading)))
-	var target_pos: Vector3 = player_node.position - back * 62.0 + Vector3(0, 26, 0)
-	camera.position = camera.position.lerp(target_pos, 2.5 * delta)
+	# --- Camera: free orbit around the player's ship ---
+	var yr := deg_to_rad(cam_yaw)
+	var pr := deg_to_rad(cam_pitch)
+	var off := Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr)) * cam_dist
+	var target_pos: Vector3 = player_node.position + off
+	camera.position = camera.position.lerp(target_pos, 8.0 * delta)
 	camera.look_at(player_node.position + Vector3(0, 8, 0))
 
 	_update_hud(dist, p_speed)

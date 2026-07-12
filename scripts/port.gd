@@ -13,6 +13,7 @@ var _quest_offers: Array = []
 
 
 func _ready() -> void:
+	Music.play_theme()
 	var bg := ColorRect.new()
 	bg.color = Color("1b2a38")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)

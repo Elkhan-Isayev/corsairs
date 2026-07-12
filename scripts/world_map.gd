@@ -13,6 +13,7 @@ var _map_area: Control
 
 
 func _ready() -> void:
+	Music.play_theme()
 	_build_ocean()
 
 	var top_panel := PanelContainer.new()

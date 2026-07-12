@@ -35,14 +35,17 @@ func _process(_delta: float) -> bool:
 			game.pending_encounter = {"nation": "pirates", "ship_type": "brig", "hostile": true}
 			change_scene_to_file("res://scenes/sea.tscn")
 		200:
-			# Full sails look better in the shot.
+			# Full sails and a cinematic three-quarter camera angle.
 			if current_scene != null and current_scene.name == "SeaBattle":
 				current_scene.player_ship.sail_setting = 1.0
+				current_scene.cam_yaw = 132.0
+				current_scene.cam_pitch = 10.0
+				current_scene.cam_dist = 55.0
 		480:
 			# Stage the shot: enemy up close, hit flashes for drama.
 			if current_scene != null and current_scene.name == "SeaBattle":
 				var b = current_scene
-				b.enemy_node.position = b.player_node.position + Vector3(70, 0, -160)
+				b.enemy_node.position = b.player_node.position + Vector3(-70, 0, 110)
 				b._spawn_shot_visuals(b.enemy_node, 8)
 		492:
 			_capture("battle")

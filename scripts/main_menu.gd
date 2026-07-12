@@ -10,6 +10,7 @@ var _nation_ids: Array = []
 
 
 func _ready() -> void:
+	Music.play_theme()
 	var bg := ColorRect.new()
 	bg.color = Color("0a1a2f")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -67,7 +68,7 @@ func _ready() -> void:
 	box.add_child(quit_btn)
 
 	var hint := Label.new()
-	hint.text = "At sea: WASD — sails and rudder, Q/E — broadsides,\nR — ammo type, B — board"
+	hint.text = "At sea: WASD — sails and rudder, Q/E — broadsides, R — ammo type,\nB — board, RMB drag — camera, wheel — zoom"
 	hint.add_theme_color_override("font_color", Color("5c7a94"))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(hint)

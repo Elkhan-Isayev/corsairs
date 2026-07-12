@@ -4,7 +4,7 @@
 [![Godot 4.7](https://img.shields.io/badge/Godot-4.7-478cbf?logo=godotengine&logoColor=white)](https://godotengine.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An open-source, **built-from-scratch** remake in the spirit of *Sea Dogs II* («Корсары 2» / *Pirates of the Caribbean*, Akella, 2003), made with **Godot 4.7**. One codebase, every platform: **Windows 10/11, macOS, Linux, and the browser**.
+An open-source, **built-from-scratch** remake made with **Godot 4.7**, inspired by [Pirates of the Caribbean (2003)](https://en.wikipedia.org/wiki/Pirates_of_the_Caribbean_(video_game)) — known in Russia as *Sea Dogs II* («Корсары 2», Akella). One codebase, every platform: **Windows 10/11, macOS, Linux, and the browser**.
 
 No original game assets are used — all code, game data, and "art" (procedural sailing ships, water shader) are written from zero.
 
@@ -31,6 +31,9 @@ No original game assets are used — all code, game data, and "art" (procedural 
 - 📜 **Governor quests** — cargo delivery, pirate hunting, passengers; deadlines and reputation penalties.
 - 🛠️ **Port life** — market, shipyard with 11 ship classes (tartane → man-of-war) and trade-in, crew hiring, repairs.
 - 💾 **Save system** — JSON saves with autosave after every voyage.
+- ⛵ **Procedural square-riggers** — smooth rounded hulls with ochre gun strakes, three sail tiers, jibs, gaff spankers, shrouds with ratlines, cannons in the ports, glowing stern lanterns — all generated at runtime, no model files.
+- 🎵 **Procedurally synthesized soundtrack** — a calm sailing theme, a tense battle track, and ocean ambience, rendered to WAV by `tools/generate_music.gd` (no sampled audio).
+- 🎥 **Free orbit camera** in battle — drag with the right mouse button, zoom with the wheel.
 
 ## Controls (sea battle)
 
@@ -41,6 +44,8 @@ No original game assets are used — all code, game data, and "art" (procedural 
 | `Q` / `E` | Fire port / starboard broadside |
 | `R` | Cycle ammo type |
 | `B` | Board the enemy (get close first!) |
+| `RMB` drag | Orbit the camera |
+| Wheel | Zoom |
 
 ## Running the game
 
@@ -99,8 +104,8 @@ core/      game logic — pure, scene-free, fully unit-tested
 tests/     custom headless test framework + unit & smoke tests
 scenes/    main_menu, world_map, port, sea (3D battle)
 scripts/   scene scripts + the Game autoload (scene routing)
-assets/    water shader
-tools/     screenshot capture script
+assets/    water shader + generated music (WAV)
+tools/     screenshot capture + music synthesizer scripts
 docs/      screenshots used by this README
 ```
 
