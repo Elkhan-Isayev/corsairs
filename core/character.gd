@@ -1,20 +1,20 @@
-## Персонаж: уровень, опыт, навыки (в духе системы «Корсаров»),
-## здоровье для абордажа, золото.
+## Player character: level, XP, skills (Sea Dogs-style system),
+## boarding health, gold.
 extends RefCounted
 
 const SKILLS := ["leadership", "fencing", "navigation", "accuracy", "cannons",
 	"boarding", "defense", "repair", "trade", "luck"]
 
 const SKILL_NAMES := {
-	"leadership": "Лидерство", "fencing": "Фехтование", "navigation": "Навигация",
-	"accuracy": "Меткость", "cannons": "Пушки", "boarding": "Абордаж",
-	"defense": "Защита", "repair": "Ремонт", "trade": "Торговля", "luck": "Удача",
+	"leadership": "Leadership", "fencing": "Fencing", "navigation": "Navigation",
+	"accuracy": "Accuracy", "cannons": "Cannons", "boarding": "Boarding",
+	"defense": "Defense", "repair": "Repair", "trade": "Trade", "luck": "Luck",
 }
 
 const MAX_SKILL := 10
 const SKILL_POINTS_PER_LEVEL := 2
 
-var char_name: String = "Капитан"
+var char_name: String = "Captain"
 var nation: String = "england"
 var level: int = 1
 var xp: int = 0
@@ -25,7 +25,7 @@ var max_hp: int = 80
 var hp: int = 80
 
 
-static func create(name := "Капитан", p_nation := "england") -> RefCounted:
+static func create(name := "Captain", p_nation := "england") -> RefCounted:
 	var c = load("res://core/character.gd").new()
 	c.char_name = name
 	c.nation = p_nation
@@ -35,7 +35,7 @@ static func create(name := "Капитан", p_nation := "england") -> RefCounte
 	return c
 
 
-## Опыт до следующего уровня растёт квадратично.
+## XP required for the next level grows quadratically.
 static func xp_for_level(lvl: int) -> int:
 	return 100 * lvl * lvl
 
@@ -82,7 +82,7 @@ func earn(amount: int) -> void:
 	gold += amount
 
 
-## Максимальный размер эскадры зависит от лидерства.
+## Maximum squadron size depends on Leadership.
 func max_squadron() -> int:
 	return 1 + int(skill("leadership") / 3.0)
 

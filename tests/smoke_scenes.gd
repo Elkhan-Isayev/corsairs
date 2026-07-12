@@ -1,5 +1,5 @@
-## Headless-обход всех сцен: godot --headless --path . -s tests/smoke_scenes.gd
-## Проверяет, что каждая сцена загружается и живёт несколько кадров без ошибок.
+## Headless walk through every scene: godot --headless --path . -s tests/smoke_scenes.gd
+## Verifies that each scene loads and survives a few frames without errors.
 extends SceneTree
 
 var _step := 0
@@ -8,9 +8,9 @@ var _errors: Array = []
 
 
 func _initialize() -> void:
-	# Автозагрузка Game должна быть на месте.
+	# The Game autoload must be present.
 	if root.get_node_or_null("Game") == null:
-		print("FATAL: autoload Game отсутствует")
+		print("FATAL: Game autoload is missing")
 		quit(1)
 
 
@@ -24,22 +24,22 @@ func _process(_delta: float) -> bool:
 			_check_scene("res://scenes/main_menu.tscn", "main_menu")
 			change_scene_to_file("res://scenes/main_menu.tscn")
 		1:
-			game.state = load("res://core/game_state.gd").new_game("Смоук", "england", 99)
+			game.state = load("res://core/game_state.gd").new_game("Smoke", "england", 99)
 			change_scene_to_file("res://scenes/port.tscn")
 		2:
-			_expect(current_scene != null and current_scene.name == "Port", "порт открылся")
+			_expect(current_scene != null and current_scene.name == "Port", "port opened")
 			change_scene_to_file("res://scenes/world_map.tscn")
 		3:
-			_expect(current_scene != null and current_scene.name == "WorldMap", "карта открылась")
+			_expect(current_scene != null and current_scene.name == "WorldMap", "map opened")
 			game.pending_encounter = {"nation": "pirates", "ship_type": "sloop", "hostile": true}
 			change_scene_to_file("res://scenes/sea.tscn")
 		4:
-			_expect(current_scene != null and current_scene.name == "SeaBattle", "морской бой запустился")
+			_expect(current_scene != null and current_scene.name == "SeaBattle", "sea battle started")
 			var battle = current_scene
-			_expect(battle.enemy_ship != null, "враг создан")
-			_expect(battle.player_node != null, "корабль игрока построен")
+			_expect(battle.enemy_ship != null, "enemy created")
+			_expect(battle.player_node != null, "player ship built")
 		5:
-			# Дать бою покрутиться ещё пару секунд физики.
+			# Let the battle physics run a couple more seconds.
 			pass
 		6:
 			for e in _errors:
@@ -52,7 +52,7 @@ func _process(_delta: float) -> bool:
 
 func _check_scene(path: String, label: String) -> void:
 	var packed = load(path)
-	_expect(packed != null, "%s загружается" % label)
+	_expect(packed != null, "%s loads" % label)
 
 
 func _expect(cond: bool, what: String) -> void:

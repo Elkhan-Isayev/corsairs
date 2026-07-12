@@ -1,14 +1,14 @@
-## Абордаж: раунды рукопашной между командами. Сила стороны зависит от
-## численности, навыка абордажа и фехтования капитана.
+## Boarding: rounds of melee between crews. A side's strength depends on
+## its numbers, the boarding skill and the captain's fencing.
 extends RefCounted
 
-## Один раунд схватки. Возвращает потери сторон.
+## One round of melee. Returns losses for both sides.
 static func fight_round(att_crew: int, att_boarding: int, att_fencing: int,
 		def_crew: int, def_boarding: int, def_fencing: int,
 		rng: RandomNumberGenerator) -> Dictionary:
 	var att_power := att_crew * (1.0 + att_boarding * 0.06 + att_fencing * 0.03) * rng.randf_range(0.8, 1.2)
 	var def_power := def_crew * (1.0 + def_boarding * 0.06 + def_fencing * 0.03) * rng.randf_range(0.8, 1.2)
-	# Потери пропорциональны силе противника; ~12% команды за раунд при равенстве.
+	# Losses are proportional to enemy strength; ~12% of crew per round when even.
 	var att_losses := int(ceil(def_power * 0.12 * att_crew / maxf(att_power, 1.0)))
 	var def_losses := int(ceil(att_power * 0.12 * def_crew / maxf(def_power, 1.0)))
 	att_losses = clampi(att_losses, 1, att_crew)
@@ -16,8 +16,9 @@ static func fight_round(att_crew: int, att_boarding: int, att_fencing: int,
 	return {"att_losses": att_losses, "def_losses": def_losses}
 
 
-## Полный абордаж до победы. Защитники сдаются, потеряв 70% начальной команды.
-## Возвращает: winner ("attacker"/"defender"), потери, число раундов.
+## Full boarding action until victory. Defenders surrender after losing
+## 70% of their starting crew.
+## Returns: winner ("attacker"/"defender"), losses, number of rounds.
 static func resolve(attacker, att_skills: Dictionary, defender, def_skills: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var att_start: int = attacker.crew
 	var def_start: int = defender.crew
@@ -39,7 +40,7 @@ static func resolve(attacker, att_skills: Dictionary, defender, def_skills: Dict
 		"att_losses": att_start - attacker.crew, "def_losses": def_start - defender.crew}
 
 
-## Трофеи с захваченного корабля: груз, боезапас и корабельная казна.
+## Spoils from a captured ship: cargo, ammo and the ship's coffer.
 static func loot(captured, rng: RandomNumberGenerator) -> Dictionary:
 	var gold := rng.randi_range(50, 400) * int(captured.spec()["rank"] <= 4) * 3 + rng.randi_range(50, 300)
 	return {"gold": gold, "cargo": captured.cargo.duplicate(), "ammo": captured.ammo_stock.duplicate()}

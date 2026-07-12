@@ -1,4 +1,4 @@
-## Состояние корабля: корпус, паруса, команда, пушки, трюм, боезапас.
+## Ship state: hull, sails, crew, cannons, cargo hold, ammo stock.
 extends RefCounted
 
 const ShipTypes := preload("res://core/ship_types.gd")
@@ -14,9 +14,9 @@ var caliber: int
 var current_ammo: String = "balls"
 var ammo_stock := {"balls": 0, "knippels": 0, "grapeshot": 0, "bombs": 0}
 var cargo := {}  # goods_id -> units
-var sail_setting: float = 0.0  # 0.0 убраны, 0.5 половина, 1.0 полные
-var heading: float = 0.0  # градусы, 0 = север
-var reload_progress: float = 1.0  # 1.0 = готов к залпу
+var sail_setting: float = 0.0  # 0.0 furled, 0.5 half, 1.0 full
+var heading: float = 0.0  # degrees, 0 = north
+var reload_progress: float = 1.0  # 1.0 = ready to fire
 
 
 static func create(p_type_id: String, name := "") -> RefCounted:
@@ -52,7 +52,7 @@ func is_sunk() -> bool:
 	return hull <= 0.0
 
 
-## Команды меньше минимума — корабль неуправляем.
+## Below minimum crew the ship cannot be handled.
 func is_crew_critical() -> bool:
 	return crew < int(spec()["min_crew"])
 
@@ -86,7 +86,7 @@ func remove_cargo(goods_id: String, units: int) -> bool:
 	return true
 
 
-## Число пушек одного борта, способных стрелять (зависит от уцелевших пушек).
+## Guns on one side able to fire (depends on surviving cannons).
 func broadside_guns() -> int:
 	return int(floor(cannons / 2.0))
 
@@ -102,7 +102,7 @@ func apply_damage(hull_dmg: float, sail_dmg: float, crew_loss: int, cannons_lost
 	cannons = maxi(cannons - cannons_lost, 0)
 
 
-## Ремонт в море силами команды (доски/парусина из трюма).
+## Field repair at sea by the crew (planks/sailcloth from the hold).
 func field_repair(planks: int, sailcloth: int) -> Dictionary:
 	var used_planks := 0
 	var used_cloth := 0

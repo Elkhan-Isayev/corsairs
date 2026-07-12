@@ -14,11 +14,11 @@ func test_fight_round_losses_bounded() -> void:
 
 func test_overwhelming_force_wins() -> void:
 	var rng := seeded_rng()
-	var att = Ship.create("frigate")   # 400 человек
-	var def = Ship.create("tartane")   # 15 человек
+	var att = Ship.create("frigate")   # 400 men
+	var def = Ship.create("tartane")   # 15 men
 	var res: Dictionary = Boarding.resolve(att, {"boarding": 8, "fencing": 8}, def, {}, rng)
-	assert_eq(res["winner"], "attacker", "400 бойцов против 15 обязаны победить")
-	assert_lt(res["att_losses"], 60, "потери при подавляющем перевесе малы")
+	assert_eq(res["winner"], "attacker", "400 fighters must beat 15")
+	assert_lt(res["att_losses"], 60, "losses are small with an overwhelming edge")
 
 
 func test_tiny_crew_loses_to_big() -> void:
@@ -30,7 +30,7 @@ func test_tiny_crew_loses_to_big() -> void:
 
 
 func test_skills_matter_in_even_fight() -> void:
-	# При равной численности сторона с прокачанным абордажем побеждает чаще.
+	# With equal numbers, the side with maxed boarding wins more often.
 	var wins := 0
 	var trials := 30
 	for i in trials:
@@ -40,7 +40,7 @@ func test_skills_matter_in_even_fight() -> void:
 		var res: Dictionary = Boarding.resolve(att, {"boarding": 10, "fencing": 10}, def, {"boarding": 0, "fencing": 0}, rng)
 		if res["winner"] == "attacker":
 			wins += 1
-	assert_gt(wins, trials * 0.7, "мастер абордажа выигрывает большинство равных схваток (побед: %d/%d)" % [wins, trials])
+	assert_gt(wins, trials * 0.7, "a boarding master wins most even fights (wins: %d/%d)" % [wins, trials])
 
 
 func test_resolve_terminates() -> void:
@@ -48,7 +48,7 @@ func test_resolve_terminates() -> void:
 	var att = Ship.create("manowar")
 	var def = Ship.create("manowar")
 	var res: Dictionary = Boarding.resolve(att, {}, def, {}, rng)
-	assert_between(res["rounds"], 1, 50, "бой всегда заканчивается")
+	assert_between(res["rounds"], 1, 50, "the fight always ends")
 
 
 func test_loot_contains_cargo_and_gold() -> void:

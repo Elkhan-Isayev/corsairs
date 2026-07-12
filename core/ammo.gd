@@ -1,26 +1,26 @@
-## Типы боеприпасов и их профили урона — как в «Корсарах»:
-## ядра бьют по корпусу, книппели рвут паруса, картечь косит команду,
-## бомбы жгут корпус, но летят ближе.
+## Ammo types and their damage profiles — as in Sea Dogs:
+## cannonballs pound the hull, chain shot shreds sails, grapeshot mows
+## down the crew, bombs burn the hull but have shorter range.
 extends RefCounted
 
 const TYPES := {
 	"balls": {
-		"name": "Ядра",
+		"name": "Cannonballs",
 		"hull_dmg": 1.0, "sail_dmg": 0.25, "crew_dmg": 0.15, "cannon_dmg": 0.10,
 		"range_mult": 1.0, "price": 2,
 	},
 	"knippels": {
-		"name": "Книппели",
+		"name": "Chain shot",
 		"hull_dmg": 0.15, "sail_dmg": 1.2, "crew_dmg": 0.10, "cannon_dmg": 0.05,
 		"range_mult": 0.8, "price": 3,
 	},
 	"grapeshot": {
-		"name": "Картечь",
+		"name": "Grapeshot",
 		"hull_dmg": 0.05, "sail_dmg": 0.15, "crew_dmg": 1.5, "cannon_dmg": 0.05,
 		"range_mult": 0.5, "price": 3,
 	},
 	"bombs": {
-		"name": "Бомбы",
+		"name": "Bombs",
 		"hull_dmg": 1.6, "sail_dmg": 0.20, "crew_dmg": 0.40, "cannon_dmg": 0.25,
 		"range_mult": 0.65, "price": 6,
 	},

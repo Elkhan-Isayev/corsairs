@@ -1,9 +1,9 @@
-## Морской бой: залп борта, попадания, распределение урона по типу боеприпаса.
+## Naval combat: broadside volleys, hits, damage split by ammo type.
 extends RefCounted
 
 const Ammo := preload("res://core/ammo.gd")
 
-const BASE_RANGE := 500.0  # метров для 16-фунтовок при ядрах
+const BASE_RANGE := 500.0  # meters for 16-pounders firing cannonballs
 
 
 static func max_range(caliber: int, ammo_id: String) -> float:
@@ -12,17 +12,17 @@ static func max_range(caliber: int, ammo_id: String) -> float:
 	return BASE_RANGE * ammo["range_mult"] * caliber_mult
 
 
-## Шанс попадания одной пушки.
+## Hit chance of a single gun.
 static func hit_chance(distance: float, range_limit: float, accuracy_skill: int, cannons_skill: int) -> float:
 	if distance > range_limit:
 		return 0.0
-	var closeness := 1.0 - distance / range_limit   # 0 у предела, 1 в упор
+	var closeness := 1.0 - distance / range_limit   # 0 at max range, 1 point-blank
 	var base := 0.15 + 0.65 * closeness
 	var skill := 1.0 + (accuracy_skill * 0.03) + (cannons_skill * 0.015)
 	return clampf(base * skill, 0.0, 0.95)
 
 
-## Полный залп борта. Возвращает отчёт и наносит урон цели.
+## Full broadside. Returns a report and applies damage to the target.
 ## attacker_skills: {"accuracy": int, "cannons": int}
 static func fire_broadside(attacker, target, distance: float, attacker_skills: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var report := {"fired": 0, "hits": 0, "hull_dmg": 0.0, "sail_dmg": 0.0, "crew_loss": 0, "cannons_lost": 0, "out_of_range": false, "no_ammo": false}
@@ -64,7 +64,7 @@ static func fire_broadside(attacker, target, distance: float, attacker_skills: D
 	return report
 
 
-## Время перезарядки в секундах: больше калибр — дольше; навык и команда ускоряют.
+## Reload time in seconds: bigger caliber is slower; skill and crew speed it up.
 static func reload_time(ship, cannons_skill: int) -> float:
 	var base: float = 18.0 + ship.caliber * 0.5
 	var crew_factor := clampf(ship.crew_frac(), 0.3, 1.0)
@@ -78,6 +78,6 @@ static func tick_reload(ship, delta: float, cannons_skill: int) -> void:
 	ship.reload_progress = minf(ship.reload_progress + delta / reload_time(ship, cannons_skill), 1.0)
 
 
-## Можно ли идти на абордаж: борта рядом и цель не утонула.
+## Boarding is possible when the hulls are close and the target still floats.
 static func can_board(distance: float, target) -> bool:
 	return distance <= 60.0 and not target.is_sunk()

@@ -1,4 +1,4 @@
-## Headless-раннер: godot --headless --path . -s tests/run_tests.gd
+## Headless runner: godot --headless --path . -s tests/run_tests.gd
 extends SceneTree
 
 const TEST_DIR := "res://tests/"

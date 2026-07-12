@@ -1,5 +1,5 @@
-## Агрегат всего состояния игры: персонаж, корабль, мир, квесты, время.
-## Плавания, случайные встречи, жалование, порт (верфь/найм), сохранения.
+## Aggregate of the whole game state: character, ship, world, quests, time.
+## Voyages, random encounters, wages, port services (shipyard/hiring), saves.
 extends RefCounted
 
 const Character := preload("res://core/character.gd")
@@ -10,15 +10,15 @@ const Quests := preload("res://core/quests.gd")
 const Sailing := preload("res://core/sailing.gd")
 
 const SAVE_PATH := "user://savegame.json"
-const CREW_HIRE_COST := 20      # золота за матроса
-const CREW_WAGE_PER_DAY := 1    # жалование за матроса в день
+const CREW_HIRE_COST := 20      # gold per sailor
+const CREW_WAGE_PER_DAY := 1    # daily wage per sailor
 
 var character: RefCounted
 var ship: RefCounted
 var world: RefCounted
 var quests: RefCounted
 var day: int = 1
-var current_island: String = "oxbay"   # "" — в море
+var current_island: String = "oxbay"   # "" — at sea
 var wind := {"from": 90.0, "strength": 8.0}
 var rng := RandomNumberGenerator.new()
 
@@ -30,7 +30,7 @@ static func new_game(captain_name: String, nation: String, seed_value: int = -1)
 	else:
 		g.rng.randomize()
 	g.character = Character.create(captain_name, nation)
-	g.ship = Ship.create("lugger", "«Удача»")
+	g.ship = Ship.create("lugger", "Fortune")
 	g.ship.ammo_stock = {"balls": 120, "knippels": 40, "grapeshot": 40, "bombs": 0}
 	g.ship.add_cargo("provisions", 30)
 	g.ship.add_cargo("planks", 15)
@@ -41,10 +41,10 @@ static func new_game(captain_name: String, nation: String, seed_value: int = -1)
 	return g
 
 
-## Плавание к острову. Возвращает журнал: дни в пути, встречи, события.
+## Voyage to an island. Returns a log: days at sea, encounters, events.
 func sail_to(island_id: String) -> Dictionary:
-	assert(current_island != "", "Уже в море")
-	assert(island_id != current_island, "Мы уже здесь")
+	assert(current_island != "", "Already at sea")
+	assert(island_id != current_island, "Already here")
 	var dist := World.distance(current_island, island_id)
 	var days := maxi(int(ceil(dist / 120.0)), 1)
 	var log := {"days": days, "encounter": null, "arrived": island_id, "wages_paid": 0, "starved": 0, "completed_quests": []}
@@ -52,7 +52,7 @@ func sail_to(island_id: String) -> Dictionary:
 	for d in days:
 		_advance_day(log)
 
-	# Случайная встреча в пути (шанс зависит от удачи: выше удача — больше добычи).
+	# Random encounter en route.
 	var encounter_chance := 0.35
 	if rng.randf() < encounter_chance:
 		log["encounter"] = _roll_encounter(island_id)
@@ -69,37 +69,37 @@ func sail_to(island_id: String) -> Dictionary:
 
 func _advance_day(log: Dictionary) -> void:
 	day += 1
-	# Жалование команде.
+	# Crew wages.
 	var wages: int = ship.crew * CREW_WAGE_PER_DAY
 	if character.gold >= wages:
 		character.gold -= wages
 		log["wages_paid"] = int(log["wages_paid"]) + wages
 	else:
-		# Нечем платить — команда разбегается.
+		# No pay — sailors desert.
 		var deserters := maxi(int(ship.crew * 0.05), 1)
 		ship.crew = maxi(ship.crew - deserters, 0)
-	# Провизия: 1 единица на 10 человек в день.
+	# Provisions: 1 unit per 10 crew per day.
 	var need := maxi(int(ceil(ship.crew / 10.0)), 1)
 	if not ship.remove_cargo("provisions", need):
 		var starved := maxi(int(ship.crew * 0.03), 1)
 		ship.crew = maxi(ship.crew - starved, 0)
 		log["starved"] = int(log["starved"]) + starved
-	# Рынки живут своей жизнью, ветер меняется.
+	# Markets live their own life, the wind shifts.
 	for island_id in world.markets:
 		world.market(island_id).daily_tick(rng)
 	wind = Sailing.drift_wind(wind["from"], wind["strength"], rng)
-	# Просроченные квесты бьют по репутации.
+	# Overdue quests hurt reputation.
 	for q in quests.expire(day):
 		world.change_reputation(World.island(q["from"])["nation"], -10)
 
 
-## Встреча в море: нация и корабль зависят от вод, куда идём.
+## Encounter at sea: nation and ship depend on whose waters we sail.
 func _roll_encounter(dest_island: String) -> Dictionary:
 	var dest_nation: String = World.island(dest_island)["nation"]
 	var nations := ["pirates", dest_nation, dest_nation]
 	var enc_nation: String = nations[rng.randi_range(0, nations.size() - 1)]
 	var pool := ["lugger", "sloop", "schooner", "barque", "brig"]
-	# С ростом уровня игрока встречаются корабли покрупнее.
+	# Bigger ships appear as the player levels up.
 	if character.level >= 8:
 		pool += ["galleon", "corvette", "frigate"]
 	elif character.level >= 4:
@@ -111,7 +111,7 @@ func _roll_encounter(dest_island: String) -> Dictionary:
 	return {"nation": enc_nation, "ship_type": type_id, "hostile": hostile}
 
 
-## Создать корабль противника для встречи (с командой и боезапасом).
+## Create the encounter's enemy ship (with crew and ammo aboard).
 func spawn_encounter_ship(encounter: Dictionary) -> RefCounted:
 	var e = Ship.create(encounter["ship_type"])
 	e.crew = int(e.spec()["max_crew"] * rng.randf_range(0.6, 1.0))
@@ -121,7 +121,7 @@ func spawn_encounter_ship(encounter: Dictionary) -> RefCounted:
 	return e
 
 
-## Победа в бою: опыт, репутация, возможный квест «охота».
+## Battle won: XP, reputation, possible "hunt" quest completion.
 func on_enemy_sunk(enemy, enemy_nation: String) -> Dictionary:
 	var xp := 30 * int(enemy.spec()["rank"] <= 4) * 3 + 40 + int(enemy.spec()["price"] / 1000.0)
 	var res: Dictionary = character.add_xp(xp)
@@ -133,7 +133,7 @@ func on_enemy_sunk(enemy, enemy_nation: String) -> Dictionary:
 	return {"xp": xp, "level_up": res["levels_gained"] > 0, "completed_quests": done}
 
 
-# --- Порт ---
+# --- Port ---
 
 func hire_crew(count: int) -> bool:
 	var space: int = int(ship.spec()["max_crew"]) - ship.crew
@@ -161,7 +161,7 @@ func repair_ship_at_shipyard() -> int:
 	return cost
 
 
-## Покупка нового корабля: старый идёт в зачёт за полцены.
+## Buying a new ship: the old one is traded in at half price.
 func buy_ship(type_id: String) -> bool:
 	var price: int = ShipTypes.get_type(type_id)["price"]
 	var trade_in := int(ship.spec()["price"] * 0.5 * ship.hull_frac())
@@ -172,7 +172,7 @@ func buy_ship(type_id: String) -> bool:
 	ship = Ship.create(type_id)
 	ship.crew = mini(old.crew, int(ship.spec()["max_crew"]))
 	ship.ammo_stock = old.ammo_stock.duplicate()
-	# Груз переносим сколько влезет.
+	# Move as much cargo as fits.
 	for g in old.cargo:
 		ship.add_cargo(g, mini(int(old.cargo[g]), ship.cargo_free()))
 	return true
@@ -185,7 +185,7 @@ func buy_ammo(ammo_id: String, units: int, price_per_unit: int) -> bool:
 	return true
 
 
-# --- Сохранение ---
+# --- Persistence ---
 
 func to_dict() -> Dictionary:
 	return {

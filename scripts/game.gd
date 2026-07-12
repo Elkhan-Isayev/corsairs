@@ -1,12 +1,12 @@
-## Автозагрузка «Game»: держит состояние партии и переключает сцены.
+## "Game" autoload: holds the session state and routes between scenes.
 extends Node
 
 const GameState := preload("res://core/game_state.gd")
 
 var state: RefCounted = null
-## Встреча, ожидающая морского боя: {"nation", "ship_type", "hostile"}
+## Encounter awaiting a sea battle: {"nation", "ship_type", "hostile"}
 var pending_encounter: Dictionary = {}
-## Журнал последнего перехода (для показа на карте).
+## Log of the last voyage (shown on the map).
 var last_sail_log: Dictionary = {}
 
 
@@ -47,7 +47,7 @@ func goto_sea_battle(encounter: Dictionary) -> void:
 	get_tree().change_scene_to_file("res://scenes/sea.tscn")
 
 
-## Плавание с карты. Возвращает true, если начался морской бой.
+## Sail from the map. Returns true if a sea battle started.
 func sail_to(island_id: String) -> bool:
 	last_sail_log = state.sail_to(island_id)
 	save_game()

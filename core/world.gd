@@ -1,17 +1,17 @@
-## Мир: Карибский архипелаг, колонии, нации и дипломатия.
+## World: the Caribbean archipelago, colonies, nations and diplomacy.
 extends RefCounted
 
 const Market := preload("res://core/market.gd")
 
 const NATIONS := {
-	"england": {"name": "Англия", "color": "c62828"},
-	"france": {"name": "Франция", "color": "1565c0"},
-	"spain": {"name": "Испания", "color": "f9a825"},
-	"holland": {"name": "Голландия", "color": "ef6c00"},
-	"pirates": {"name": "Пираты", "color": "212121"},
+	"england": {"name": "England", "color": "c62828"},
+	"france": {"name": "France", "color": "1565c0"},
+	"spain": {"name": "Spain", "color": "f9a825"},
+	"holland": {"name": "Holland", "color": "ef6c00"},
+	"pirates": {"name": "Pirates", "color": "212121"},
 }
 
-## Стартовая дипломатия: -1 война, 0 нейтралитет, 1 мир.
+## Starting diplomacy: -1 war, 0 neutral, 1 peace.
 const DEFAULT_RELATIONS := {
 	"england": {"france": -1, "spain": -1, "holland": 1, "pirates": -1},
 	"france": {"england": -1, "spain": 0, "holland": 0, "pirates": -1},
@@ -20,34 +20,34 @@ const DEFAULT_RELATIONS := {
 	"pirates": {"england": -1, "france": -1, "spain": -1, "holland": -1},
 }
 
-## Архипелаг. Координаты в условных морских милях на карте 1000x800.
+## The archipelago. Coordinates in nautical miles on a 1000x800 map.
 const ISLANDS := {
 	"oxbay": {
-		"name": "Оксбей", "nation": "england", "pos": [220, 300], "tier": 1,
+		"name": "Oxbay", "nation": "england", "pos": [220, 300], "tier": 1,
 		"exports": ["rum", "sugar"], "imports": ["weapons", "silk"],
 	},
 	"redmond": {
-		"name": "Редмонд", "nation": "england", "pos": [400, 480], "tier": 3,
+		"name": "Redmond", "nation": "england", "pos": [400, 480], "tier": 3,
 		"exports": ["tobacco", "cotton"], "imports": ["medicines", "wine"],
 	},
 	"isla_muelle": {
-		"name": "Исла Муэлле", "nation": "spain", "pos": [640, 220], "tier": 3,
+		"name": "Isla Muelle", "nation": "spain", "pos": [640, 220], "tier": 3,
 		"exports": ["coffee", "cocoa"], "imports": ["gunpowder", "planks"],
 	},
 	"conceicao": {
-		"name": "Консейсао", "nation": "spain", "pos": [780, 420], "tier": 2,
+		"name": "Conceicao", "nation": "spain", "pos": [780, 420], "tier": 2,
 		"exports": ["ebony", "spices"], "imports": ["provisions", "sailcloth"],
 	},
 	"falaise_de_fleur": {
-		"name": "Фалез-де-Флёр", "nation": "france", "pos": [520, 640], "tier": 3,
+		"name": "Falaise de Fleur", "nation": "france", "pos": [520, 640], "tier": 3,
 		"exports": ["wine", "silk"], "imports": ["sugar", "tobacco"],
 	},
 	"douwesen": {
-		"name": "Дувесен", "nation": "holland", "pos": [840, 620], "tier": 2,
+		"name": "Douwesen", "nation": "holland", "pos": [840, 620], "tier": 2,
 		"exports": ["cotton", "provisions"], "imports": ["rum", "coffee"],
 	},
 	"quebradas": {
-		"name": "Кебрадас-Костильяс", "nation": "pirates", "pos": [150, 620], "tier": 1,
+		"name": "Quebradas Costillas", "nation": "pirates", "pos": [150, 620], "tier": 1,
 		"exports": ["weapons", "gunpowder"], "imports": ["medicines", "provisions"],
 	},
 }
@@ -93,7 +93,7 @@ func are_at_war(nation_a: String, nation_b: String) -> bool:
 	return int(relations[nation_a].get(nation_b, 0)) < 0
 
 
-## Репутация игрока у нации, -100..100.
+## Player reputation with a nation, -100..100.
 func reputation(nation: String) -> int:
 	return int(player_reputation.get(nation, 0))
 
@@ -102,8 +102,8 @@ func change_reputation(nation: String, delta: int) -> void:
 	player_reputation[nation] = clampi(reputation(nation) + delta, -100, 100)
 
 
-## Потопление/захват корабля нации: её отношение падает,
-## отношение её врагов растёт.
+## Sinking/capturing a nation's ship: its opinion drops,
+## its enemies approve.
 func on_player_attacked(victim_nation: String) -> void:
 	change_reputation(victim_nation, -15)
 	for n in NATIONS:
@@ -111,7 +111,7 @@ func on_player_attacked(victim_nation: String) -> void:
 			change_reputation(n, 6)
 
 
-## Пустят ли игрока в порт: репутация ниже -30 — порт закрыт.
+## Whether the port turns the player away: below -30 the port is closed.
 func is_port_hostile(island_id: String) -> bool:
 	var nation: String = ISLANDS[island_id]["nation"]
 	return reputation(nation) < -30

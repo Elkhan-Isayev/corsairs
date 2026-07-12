@@ -1,4 +1,4 @@
-## Минимальный тестовый фреймворк: базовый класс теста с ассертами.
+## Minimal test framework: base test class with assertions.
 extends RefCounted
 
 var failures: Array = []
@@ -67,7 +67,7 @@ func assert_almost_eq(got: float, expected: float, tolerance := 0.001, msg := ""
 		_fail("expected ~%s (±%s), got %s. %s" % [expected, tolerance, got, msg])
 
 
-## Детерминированный RNG для воспроизводимых тестов.
+## Deterministic RNG for reproducible tests.
 func seeded_rng(seed_value: int = 12345) -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value

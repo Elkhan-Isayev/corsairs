@@ -1,14 +1,14 @@
-## Квесты губернаторов: доставка груза, охота на пирата, перевозка пассажира.
+## Governor quests: cargo delivery, pirate hunting, carrying a passenger.
 extends RefCounted
 
 const World := preload("res://core/world.gd")
 const Goods := preload("res://core/goods.gd")
 
-var active: Array = []   # массив словарей-квестов
+var active: Array = []   # array of quest dictionaries
 var next_id: int = 1
 
 
-## Сгенерировать предложение квеста в колонии.
+## Generate a quest offer at a colony.
 func generate_offer(from_island: String, day: int, rng: RandomNumberGenerator) -> Dictionary:
 	var others := World.island_ids().filter(func(i): return i != from_island)
 	var dest: String = others[rng.randi_range(0, others.size() - 1)]
@@ -24,13 +24,13 @@ func generate_offer(from_island: String, day: int, rng: RandomNumberGenerator) -
 			var goods: Array = Goods.all_ids()
 			quest["goods"] = goods[rng.randi_range(0, goods.size() - 1)]
 			quest["units"] = rng.randi_range(20, 80)
-			quest["title"] = "Доставить груз в %s" % World.island(dest)["name"]
+			quest["title"] = "Deliver cargo to %s" % World.island(dest)["name"]
 		"hunt":
 			quest["target_ship"] = ["lugger", "sloop", "barque", "brig"][rng.randi_range(0, 3)]
 			quest["reward"] += 400
-			quest["title"] = "Потопить пирата у %s" % World.island(dest)["name"]
+			quest["title"] = "Sink a pirate near %s" % World.island(dest)["name"]
 		"passenger":
-			quest["title"] = "Доставить пассажира в %s" % World.island(dest)["name"]
+			quest["title"] = "Carry a passenger to %s" % World.island(dest)["name"]
 	return quest
 
 
@@ -43,8 +43,8 @@ func accept(quest: Dictionary, ship = null) -> bool:
 	return true
 
 
-## Проверить выполнение при событии. event: {"type": "arrived"/"sunk_pirate", ...}
-## Возвращает завершённые квесты (уже убраны из активных).
+## Check completion on an event. event: {"type": "arrived"/"sunk_pirate", ...}
+## Returns completed quests (already removed from the active list).
 func check_completion(event: Dictionary, day: int, ship = null) -> Array:
 	var done: Array = []
 	var still: Array = []
@@ -68,7 +68,7 @@ func check_completion(event: Dictionary, day: int, ship = null) -> Array:
 	return done
 
 
-## Убрать просроченные. Возвращает их список (для штрафа репутации).
+## Drop overdue quests. Returns them (for the reputation penalty).
 func expire(day: int) -> Array:
 	var expired := active.filter(func(q): return day > int(q["deadline_day"]))
 	active = active.filter(func(q): return day <= int(q["deadline_day"]))

@@ -6,8 +6,8 @@ const ShipTypes := preload("res://core/ship_types.gd")
 
 func test_create_ship_has_full_stats() -> void:
 	var s = Ship.create("lugger")
-	assert_eq(s.hull, 450.0, "корпус люгера")
-	assert_eq(s.crew, 40, "полная команда")
+	assert_eq(s.hull, 450.0, "lugger hull")
+	assert_eq(s.crew, 40, "full crew")
 	assert_eq(s.cannons, 8)
 	assert_almost_eq(s.hull_frac(), 1.0)
 	assert_false(s.is_sunk())
@@ -26,22 +26,22 @@ func test_all_ship_types_valid() -> void:
 func test_shipyard_tiers() -> void:
 	var small: Array = ShipTypes.available_for_shipyard(1)
 	var big: Array = ShipTypes.available_for_shipyard(3)
-	assert_true(small.has("lugger"), "мелкая верфь продаёт люгеры")
-	assert_false(small.has("frigate"), "мелкая верфь не продаёт фрегаты")
-	assert_true(big.has("manowar"), "столичная верфь продаёт всё")
+	assert_true(small.has("lugger"), "small shipyard sells luggers")
+	assert_false(small.has("frigate"), "small shipyard has no frigates")
+	assert_true(big.has("manowar"), "capital shipyard sells everything")
 	assert_gt(big.size(), small.size())
 
 
 func test_cargo_limits() -> void:
-	var s = Ship.create("tartane")  # трюм 250
+	var s = Ship.create("tartane")  # hold 250
 	assert_true(s.add_cargo("rum", 200))
 	assert_eq(s.cargo_free(), 50)
-	assert_false(s.add_cargo("sugar", 51), "переполнение трюма")
+	assert_false(s.add_cargo("sugar", 51), "hold overflow")
 	assert_true(s.add_cargo("sugar", 50))
 	assert_eq(s.cargo_free(), 0)
-	assert_false(s.remove_cargo("coffee", 1), "нет такого товара")
+	assert_false(s.remove_cargo("coffee", 1), "no such goods aboard")
 	assert_true(s.remove_cargo("rum", 200))
-	assert_false(s.cargo.has("rum"), "пустая позиция удаляется")
+	assert_false(s.cargo.has("rum"), "empty entry is removed")
 
 
 func test_damage_and_sinking() -> void:
@@ -53,7 +53,7 @@ func test_damage_and_sinking() -> void:
 	assert_eq(s.cannons, 10)
 	s.apply_damage(9999.0, 0.0, 0, 0)
 	assert_true(s.is_sunk())
-	assert_eq(s.hull, 0.0, "корпус не уходит в минус")
+	assert_eq(s.hull, 0.0, "hull never goes negative")
 
 
 func test_crew_critical() -> void:
@@ -69,26 +69,26 @@ func test_field_repair_caps_at_85_percent() -> void:
 	s.hull = 100.0
 	s.sails = 0.0
 	var used: Dictionary = s.field_repair(1000, 1000)
-	assert_almost_eq(s.hull, 1400.0 * 0.85, 0.01, "полевой ремонт корпуса ограничен 85%")
-	assert_eq(s.sails, 350.0, "паруса чинятся полностью")
+	assert_almost_eq(s.hull, 1400.0 * 0.85, 0.01, "field hull repair caps at 85%")
+	assert_eq(s.sails, 350.0, "sails repair fully")
 	assert_gt(used["planks"], 0)
 	assert_gt(used["sailcloth"], 0)
 
 
 func test_broadside_guns_halved() -> void:
-	var s = Ship.create("galleon")  # 32 пушки
+	var s = Ship.create("galleon")  # 32 cannons
 	assert_eq(s.broadside_guns(), 16)
 	s.cannons = 7
 	assert_eq(s.broadside_guns(), 3)
 
 
 func test_serialization_round_trip() -> void:
-	var s = Ship.create("schooner", "«Ласточка»")
+	var s = Ship.create("schooner", "Swallow")
 	s.apply_damage(123.0, 45.0, 7, 1)
 	s.add_cargo("silk", 33)
 	s.ammo_stock["bombs"] = 17
 	var restored = Ship.from_dict(s.to_dict())
-	assert_eq(restored.custom_name, "«Ласточка»")
+	assert_eq(restored.custom_name, "Swallow")
 	assert_eq(restored.hull, s.hull)
 	assert_eq(restored.crew, s.crew)
 	assert_eq(restored.cargo["silk"], 33)

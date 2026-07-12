@@ -1,4 +1,4 @@
-## Порт: вкладки «Порт», «Рынок», «Верфь», «Капитан».
+## Port: "Port", "Market", "Shipyard" and "Captain" tabs.
 extends Control
 
 const World := preload("res://core/world.gd")
@@ -53,7 +53,7 @@ func _generate_quest_offers() -> void:
 func _rebuild() -> void:
 	var s = Game.state
 	var isl := _island()
-	_header.text = "%s — колония: %s | День %d | %d зол. | %s: корпус %d%%, команда %d/%d" % [
+	_header.text = "%s — %s colony | Day %d | %d gold | %s: hull %d%%, crew %d/%d" % [
 		isl["name"], World.NATIONS[isl["nation"]]["name"], s.day, s.character.gold,
 		s.ship.custom_name, int(s.ship.hull_frac() * 100), s.ship.crew, s.ship.spec()["max_crew"]]
 
@@ -81,10 +81,10 @@ func _label(text: String, color := "cfe3f5") -> Label:
 	return l
 
 
-# --- Вкладка «Порт» ---
+# --- Port tab ---
 
 func _build_port_tab() -> Control:
-	var sc := _scroll_tab("Порт")
+	var sc := _scroll_tab("Port")
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 10)
@@ -93,7 +93,7 @@ func _build_port_tab() -> Control:
 	var isl := _island()
 
 	var rep: int = s.world.reputation(isl["nation"])
-	box.add_child(_label("Отношение %s к вам: %d" % [World.NATIONS[isl["nation"]]["name"], rep],
+	box.add_child(_label("%s's attitude toward you: %d" % [World.NATIONS[isl["nation"]]["name"], rep],
 		"81c784" if rep >= 0 else "e57373"))
 
 	var row := HBoxContainer.new()
@@ -101,67 +101,67 @@ func _build_port_tab() -> Control:
 	box.add_child(row)
 
 	var sail := Button.new()
-	sail.text = "⚓ Поднять паруса (карта)"
+	sail.text = "⚓ Set sail (map)"
 	sail.pressed.connect(func(): Game.goto_map())
 	row.add_child(sail)
 
 	var hire := Button.new()
-	hire.text = "Нанять 10 матросов (%d зол.)" % (10 * 20)
+	hire.text = "Hire 10 sailors (%d gold)" % (10 * 20)
 	hire.pressed.connect(func():
 		if not Game.state.hire_crew(10):
-			OS.alert("Нет денег или мест в команде.", "Таверна")
+			OS.alert("Not enough gold or berths.", "Tavern")
 		_rebuild())
 	row.add_child(hire)
 
 	var repair := Button.new()
-	repair.text = "Починить корабль"
+	repair.text = "Repair ship"
 	repair.pressed.connect(func():
 		var cost: int = Game.state.repair_ship_at_shipyard()
 		if cost < 0:
-			OS.alert("Не хватает золота на ремонт.", "Верфь")
+			OS.alert("Not enough gold for repairs.", "Shipyard")
 		elif cost == 0:
-			OS.alert("Корабль в полном порядке.", "Верфь")
+			OS.alert("The ship is in perfect shape.", "Shipyard")
 		_rebuild())
 	row.add_child(repair)
 
 	var save_btn := Button.new()
-	save_btn.text = "Сохранить игру"
-	save_btn.pressed.connect(func(): Game.save_game(); OS.alert("Игра сохранена.", "Корсары"))
+	save_btn.text = "Save game"
+	save_btn.pressed.connect(func(): Game.save_game(); OS.alert("Game saved.", "Corsairs"))
 	row.add_child(save_btn)
 
 	box.add_child(HSeparator.new())
-	box.add_child(_label("— Губернатор предлагает —", "e8c872"))
+	box.add_child(_label("— The governor offers —", "e8c872"))
 	for offer in _quest_offers:
 		var qrow := HBoxContainer.new()
 		qrow.add_theme_constant_override("separation", 10)
 		box.add_child(qrow)
-		var desc := "%s | награда %d зол. | срок: день %d" % [offer["title"], offer["reward"], offer["deadline_day"]]
+		var desc := "%s | reward %d gold | due: day %d" % [offer["title"], offer["reward"], offer["deadline_day"]]
 		if offer["kind"] == "deliver":
-			desc += " | груз: %s ×%d" % [Goods.get_type(offer["goods"])["name"], offer["units"]]
+			desc += " | cargo: %s ×%d" % [Goods.get_type(offer["goods"])["name"], offer["units"]]
 		qrow.add_child(_label(desc))
 		var take := Button.new()
-		take.text = "Взять"
+		take.text = "Accept"
 		take.pressed.connect(func():
 			if Game.state.quests.accept(offer, Game.state.ship):
 				_quest_offers.erase(offer)
 			else:
-				OS.alert("Не хватает места в трюме!", "Губернатор")
+				OS.alert("Not enough cargo space!", "Governor")
 			_rebuild())
 		qrow.add_child(take)
 
 	box.add_child(HSeparator.new())
-	box.add_child(_label("— Взятые задания —", "e8c872"))
+	box.add_child(_label("— Active quests —", "e8c872"))
 	if s.quests.active.is_empty():
-		box.add_child(_label("Нет активных заданий."))
+		box.add_child(_label("No active quests."))
 	for q in s.quests.active:
-		box.add_child(_label("• %s (до дня %d, %d зол.)" % [q["title"], q["deadline_day"], q["reward"]]))
+		box.add_child(_label("• %s (by day %d, %d gold)" % [q["title"], q["deadline_day"], q["reward"]]))
 	return sc
 
 
-# --- Вкладка «Рынок» ---
+# --- Market tab ---
 
 func _build_market_tab() -> Control:
-	var sc := _scroll_tab("Рынок")
+	var sc := _scroll_tab("Market")
 	var grid := GridContainer.new()
 	grid.columns = 7
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -173,7 +173,7 @@ func _build_market_tab() -> Control:
 	var m = s.world.market(s.current_island)
 	var trade: int = s.character.skill("trade")
 
-	for h in ["Товар", "Склад", "Купить за", "Продать за", "В трюме", "", ""]:
+	for h in ["Goods", "Stock", "Buy at", "Sell at", "In hold", "", ""]:
 		grid.add_child(_label(h, "e8c872"))
 
 	for g in Goods.all_ids():
@@ -184,34 +184,34 @@ func _build_market_tab() -> Control:
 		var name_color := "81c784" if is_export else ("e57373" if is_import else "cfe3f5")
 		grid.add_child(_label(info["name"] + ("  ↓" if is_export else ("  ↑" if is_import else "")), name_color))
 		grid.add_child(_label(str(m.stock.get(g, 0))))
-		grid.add_child(_label("%d зол." % m.buy_price(g, trade)))
-		grid.add_child(_label("%d зол." % m.sell_price(g, trade)))
+		grid.add_child(_label("%d g" % m.buy_price(g, trade)))
+		grid.add_child(_label("%d g" % m.sell_price(g, trade)))
 		grid.add_child(_label(str(in_hold)))
 
 		var buy := Button.new()
-		buy.text = "Купить 10"
+		buy.text = "Buy 10"
 		buy.pressed.connect(func():
 			if m.player_buy(g, 10, s.character, s.ship, trade) < 0:
-				OS.alert("Сделка невозможна: нет денег, товара или места.", "Рынок")
+				OS.alert("Deal impossible: no gold, stock or space.", "Market")
 			_rebuild())
 		grid.add_child(buy)
 
 		var sell := Button.new()
-		sell.text = "Продать 10"
+		sell.text = "Sell 10"
 		sell.disabled = in_hold < 10
 		sell.pressed.connect(func():
 			if m.player_sell(g, 10, s.character, s.ship, trade) < 0:
-				OS.alert("У вас нет столько товара.", "Рынок")
+				OS.alert("You don't have that much cargo.", "Market")
 			_rebuild())
 		grid.add_child(sell)
 
 	return sc
 
 
-# --- Вкладка «Верфь» ---
+# --- Shipyard tab ---
 
 func _build_shipyard_tab() -> Control:
-	var sc := _scroll_tab("Верфь")
+	var sc := _scroll_tab("Shipyard")
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 8)
@@ -219,24 +219,24 @@ func _build_shipyard_tab() -> Control:
 	var s = Game.state
 	var isl := _island()
 
-	box.add_child(_label("— Боеприпасы (трюм: свободно %d) —" % s.ship.cargo_free(), "e8c872"))
+	box.add_child(_label("— Ammunition (hold space: %d) —" % s.ship.cargo_free(), "e8c872"))
 	var arow := HBoxContainer.new()
 	arow.add_theme_constant_override("separation", 10)
 	box.add_child(arow)
 	for a in Ammo.ORDER:
 		var t := Ammo.get_type(a)
 		var b := Button.new()
-		b.text = "%s ×50 (%d зол.) [есть %d]" % [t["name"], t["price"] * 50, s.ship.ammo_stock.get(a, 0)]
+		b.text = "%s ×50 (%d g) [have %d]" % [t["name"], t["price"] * 50, s.ship.ammo_stock.get(a, 0)]
 		b.pressed.connect(func():
 			if not Game.state.buy_ammo(a, 50, t["price"]):
-				OS.alert("Не хватает золота.", "Верфь")
+				OS.alert("Not enough gold.", "Shipyard")
 			_rebuild())
 		arow.add_child(b)
 
 	box.add_child(HSeparator.new())
-	box.add_child(_label("— Корабли на продажу (ваш пойдёт в зачёт) —", "e8c872"))
+	box.add_child(_label("— Ships for sale (yours is traded in) —", "e8c872"))
 	var trade_in := int(s.ship.spec()["price"] * 0.5 * s.ship.hull_frac())
-	box.add_child(_label("За ваш «%s» дадут: %d зол." % [s.ship.spec()["name"], trade_in]))
+	box.add_child(_label("Your %s trades in for: %d gold" % [s.ship.spec()["name"], trade_in]))
 
 	for id in ShipTypes.available_for_shipyard(int(isl["tier"])):
 		if id == s.ship.type_id:
@@ -245,32 +245,32 @@ func _build_shipyard_tab() -> Control:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		box.add_child(row)
-		row.add_child(_label("%s (ранг %d): корпус %d, пушек %d, трюм %d, скорость %.1f — %d зол." % [
+		row.add_child(_label("%s (rank %d): hull %d, guns %d, hold %d, speed %.1f — %d gold" % [
 			t["name"], t["rank"], t["hull"], t["cannons"], t["cargo"], t["base_speed"], t["price"]]))
 		var buy := Button.new()
 		var to_pay := maxi(int(t["price"]) - trade_in, 0)
-		buy.text = "Купить (доплата %d)" % to_pay
+		buy.text = "Buy (pay %d)" % to_pay
 		buy.disabled = not s.character.can_afford(to_pay)
 		buy.pressed.connect(func():
 			if Game.state.buy_ship(id):
-				OS.alert("Поздравляем с покупкой: %s!" % t["name"], "Верфь")
+				OS.alert("Congratulations on your new %s!" % t["name"], "Shipyard")
 			_rebuild())
 		row.add_child(buy)
 	return sc
 
 
-# --- Вкладка «Капитан» ---
+# --- Captain tab ---
 
 func _build_captain_tab() -> Control:
-	var sc := _scroll_tab("Капитан")
+	var sc := _scroll_tab("Captain")
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 8)
 	sc.add_child(box)
 	var c = Game.state.character
 
-	box.add_child(_label("%s, уровень %d (%s)" % [c.char_name, c.level, World.NATIONS[c.nation]["name"]], "e8c872"))
-	box.add_child(_label("Опыт: %d / %d | Свободных очков: %d" % [c.xp, Character.xp_for_level(c.level), c.free_skill_points]))
+	box.add_child(_label("%s, level %d (%s)" % [c.char_name, c.level, World.NATIONS[c.nation]["name"]], "e8c872"))
+	box.add_child(_label("XP: %d / %d | Free skill points: %d" % [c.xp, Character.xp_for_level(c.level), c.free_skill_points]))
 	box.add_child(HSeparator.new())
 
 	for skill_id in Character.SKILLS:
@@ -286,7 +286,7 @@ func _build_captain_tab() -> Control:
 			row.add_child(plus)
 
 	box.add_child(HSeparator.new())
-	box.add_child(_label("— Репутация у наций —", "e8c872"))
+	box.add_child(_label("— Standing with the nations —", "e8c872"))
 	for n in World.NATIONS:
 		var rep: int = Game.state.world.reputation(n)
 		box.add_child(_label("%s: %d" % [World.NATIONS[n]["name"], rep],

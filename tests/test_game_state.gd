@@ -4,7 +4,7 @@ const GameState := preload("res://core/game_state.gd")
 
 
 func _game(seed_value := 42) -> RefCounted:
-	return GameState.new_game("Тест", "england", seed_value)
+	return GameState.new_game("Test", "england", seed_value)
 
 
 func test_new_game_setup() -> void:
@@ -13,12 +13,12 @@ func test_new_game_setup() -> void:
 	assert_eq(g.current_island, "oxbay")
 	assert_eq(g.ship.type_id, "lugger")
 	assert_gt(g.ship.ammo_stock["balls"], 0)
-	assert_gt(int(g.ship.cargo.get("provisions", 0)), 0, "стартовая провизия")
+	assert_gt(int(g.ship.cargo.get("provisions", 0)), 0, "starting provisions")
 	assert_eq(g.character.nation, "england")
 
 
 func test_pirate_starts_at_pirate_island() -> void:
-	var g = GameState.new_game("Флибустьер", "pirates", 1)
+	var g = GameState.new_game("Freebooter", "pirates", 1)
 	assert_eq(g.current_island, "quebradas")
 
 
@@ -27,15 +27,15 @@ func test_sail_advances_time_and_arrives() -> void:
 	var gold_before: int = g.character.gold
 	var log: Dictionary = g.sail_to("redmond")
 	assert_eq(g.current_island, "redmond")
-	assert_gt(g.day, 1, "время идёт")
+	assert_gt(g.day, 1, "time passes")
 	assert_eq(log["days"], g.day - 1)
-	assert_lt(g.character.gold, gold_before, "жалование уплачено")
+	assert_lt(g.character.gold, gold_before, "wages paid")
 
 
 func test_sail_consumes_provisions() -> void:
 	var g := _game()
 	var prov_before: int = g.ship.cargo["provisions"]
-	g.sail_to("douwesen")  # дальний переход
+	g.sail_to("douwesen")  # a long passage
 	assert_lt(int(g.ship.cargo.get("provisions", 0)), prov_before)
 
 
@@ -44,7 +44,7 @@ func test_starvation_kills_crew() -> void:
 	g.ship.remove_cargo("provisions", int(g.ship.cargo["provisions"]))
 	var crew_before: int = g.ship.crew
 	g.sail_to("douwesen")
-	assert_lt(g.ship.crew, crew_before, "без провизии команда мрёт")
+	assert_lt(g.ship.crew, crew_before, "the crew starves without provisions")
 
 
 func test_no_gold_causes_desertion() -> void:
@@ -52,7 +52,7 @@ func test_no_gold_causes_desertion() -> void:
 	g.character.gold = 0
 	var crew_before: int = g.ship.crew
 	g.sail_to("redmond")
-	assert_lt(g.ship.crew, crew_before, "без жалования команда дезертирует")
+	assert_lt(g.ship.crew, crew_before, "unpaid sailors desert")
 
 
 func test_encounters_are_reproducible_and_valid() -> void:
@@ -68,7 +68,7 @@ func test_encounters_are_reproducible_and_valid() -> void:
 			var enemy = g.spawn_encounter_ship(e)
 			assert_gt(enemy.crew, 0)
 			assert_gt(enemy.ammo_stock["balls"], 0)
-	assert_true(found, "за 20 переходов хоть одна встреча")
+	assert_true(found, "at least one encounter in 20 passages")
 
 
 func test_pirates_always_hostile() -> void:
@@ -76,7 +76,7 @@ func test_pirates_always_hostile() -> void:
 	for i in 50:
 		var e: Dictionary = g._roll_encounter("redmond")
 		if e["nation"] == "pirates":
-			assert_true(e["hostile"], "пираты всегда враждебны")
+			assert_true(e["hostile"], "pirates are always hostile")
 
 
 func test_sunk_enemy_gives_xp_and_reputation_hit() -> void:
@@ -84,9 +84,9 @@ func test_sunk_enemy_gives_xp_and_reputation_hit() -> void:
 	var enemy = g.spawn_encounter_ship({"nation": "spain", "ship_type": "barque", "hostile": true})
 	var xp_before: int = g.character.xp
 	g.on_enemy_sunk(enemy, "spain")
-	assert_gt(g.character.xp + g.character.level * 0, xp_before, "опыт получен")
-	assert_lt(g.world.reputation("spain"), 0, "Испания в ярости")
-	assert_gt(g.world.reputation("england"), 0, "Англия довольна")
+	assert_gt(g.character.xp + g.character.level * 0, xp_before, "XP granted")
+	assert_lt(g.world.reputation("spain"), 0, "Spain is furious")
+	assert_gt(g.world.reputation("england"), 0, "England approves")
 
 
 func test_hire_crew() -> void:
@@ -96,9 +96,9 @@ func test_hire_crew() -> void:
 	assert_true(g.hire_crew(20))
 	assert_eq(g.ship.crew, 30)
 	assert_eq(g.character.gold, gold_before - 20 * GameState.CREW_HIRE_COST)
-	assert_false(g.hire_crew(9999), "больше максимума не нанять")
+	assert_false(g.hire_crew(9999), "cannot hire past the maximum")
 	g.character.gold = 0
-	assert_false(g.hire_crew(1), "нет денег — нет матросов")
+	assert_false(g.hire_crew(1), "no gold — no sailors")
 
 
 func test_shipyard_repair() -> void:
@@ -109,10 +109,10 @@ func test_shipyard_repair() -> void:
 	assert_gt(cost, 0)
 	assert_almost_eq(g.ship.hull_frac(), 1.0)
 	assert_eq(g.ship.cannons, int(g.ship.spec()["cannons"]))
-	assert_eq(g.repair_ship_at_shipyard(), 0, "чинить нечего")
+	assert_eq(g.repair_ship_at_shipyard(), 0, "nothing left to repair")
 	g.ship.apply_damage(500.0, 0.0, 0, 0)
 	g.character.gold = 1
-	assert_eq(g.repair_ship_at_shipyard(), -1, "нет денег на ремонт")
+	assert_eq(g.repair_ship_at_shipyard(), -1, "no gold for repairs")
 
 
 func test_buy_ship_with_trade_in() -> void:
@@ -121,10 +121,10 @@ func test_buy_ship_with_trade_in() -> void:
 	g.ship.add_cargo("rum", 50)
 	assert_true(g.buy_ship("schooner"))
 	assert_eq(g.ship.type_id, "schooner")
-	assert_eq(int(g.ship.cargo.get("rum", 0)), 50, "груз переехал")
-	assert_lt(g.character.gold, 20000, "заплатили разницу")
+	assert_eq(int(g.ship.cargo.get("rum", 0)), 50, "cargo moved over")
+	assert_lt(g.character.gold, 20000, "paid the difference")
 	g.character.gold = 0
-	assert_false(g.buy_ship("manowar"), "мановар не по карману")
+	assert_false(g.buy_ship("manowar"), "a man-of-war is out of reach")
 
 
 func test_buy_ammo() -> void:
@@ -160,20 +160,20 @@ func test_load_missing_save_returns_null() -> void:
 
 
 func test_full_playthrough_smoke() -> void:
-	# Мини-прохождение: торговый рейс + бой + абордаж, всё на одном сиде.
+	# Mini-playthrough: a trade run + a battle + a boarding, all on one seed.
 	var Combat := preload("res://core/combat.gd")
 	var Boarding := preload("res://core/boarding.gd")
 	var g := _game(2026)
 	var m = g.world.market("oxbay")
-	# Закупаем ром в Оксбее (экспорт — дёшево).
+	# Buy rum in Oxbay (an export — cheap).
 	var spent: int = m.player_buy("rum", 40, g.character, g.ship, g.character.skill("trade"))
 	assert_gt(spent, 0)
-	# Везём в Дувесен (там ром — импорт).
+	# Carry it to Douwesen (rum is an import there).
 	g.sail_to("douwesen")
 	var m2 = g.world.market("douwesen")
 	var income: int = m2.player_sell("rum", 40, g.character, g.ship, g.character.skill("trade"))
-	assert_gt(income, spent, "торговый рейс прибыльный")
-	# Бой с пиратом.
+	assert_gt(income, spent, "the trade run turns a profit")
+	# Fight a pirate.
 	var enemy = g.spawn_encounter_ship({"nation": "pirates", "ship_type": "sloop", "hostile": true})
 	var rounds := 0
 	while not enemy.is_sunk() and rounds < 100:
@@ -184,4 +184,4 @@ func test_full_playthrough_smoke() -> void:
 			var res: Dictionary = Boarding.resolve(g.ship, {"boarding": 3, "fencing": 3}, enemy, {}, g.rng)
 			if res["winner"] == "attacker":
 				break
-	assert_true(enemy.is_sunk() or enemy.crew <= int(enemy.spec()["max_crew"] * 0.3) or rounds < 100, "враг побеждён")
+	assert_true(enemy.is_sunk() or enemy.crew <= int(enemy.spec()["max_crew"] * 0.3) or rounds < 100, "the enemy is beaten")

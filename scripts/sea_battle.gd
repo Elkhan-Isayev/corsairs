@@ -1,5 +1,5 @@
-## Морской бой в 3D: игрок против корабля встречи.
-## WASD — паруса/руль, Q/E — залпы бортов, R — тип заряда, B — абордаж.
+## 3D sea battle: the player against an encounter ship.
+## WASD — sails/rudder, Q/E — broadsides, R — ammo type, B — board.
 extends Node3D
 
 const Sailing := preload("res://core/sailing.gd")
@@ -9,7 +9,7 @@ const Ammo := preload("res://core/ammo.gd")
 const World := preload("res://core/world.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
 
-const SPEED_SCALE := 2.0      # узлы -> м/с (ускорено ради динамики)
+const SPEED_SCALE := 2.0      # knots -> m/s (sped up for pacing)
 const ESCAPE_DISTANCE := 1600.0
 
 var player_ship: RefCounted
@@ -43,7 +43,7 @@ func _ready() -> void:
 	_build_environment()
 	_build_ships()
 	_build_hud()
-	_log("Противник: %s «%s» (%s). Ветер %d°." % [
+	_log("Enemy: %s \"%s\" (%s). Wind %d°." % [
 		enemy_ship.spec()["name"], enemy_ship.custom_name,
 		World.NATIONS[enemy_nation]["name"], int(Game.state.wind["from"])])
 
@@ -165,14 +165,14 @@ func _physics_process(delta: float) -> void:
 	var nav: int = Game.state.character.skill("navigation")
 	var cann: int = Game.state.character.skill("cannons")
 
-	# --- Игрок ---
+	# --- Player ---
 	if Input.is_action_just_pressed("sails_up"):
 		player_ship.sail_setting = clampf(player_ship.sail_setting + 0.5, 0.0, 1.0)
 	if Input.is_action_just_pressed("sails_down"):
 		player_ship.sail_setting = clampf(player_ship.sail_setting - 0.5, 0.0, 1.0)
 	if Input.is_action_just_pressed("next_ammo"):
 		player_ship.current_ammo = Ammo.next_type(player_ship.current_ammo)
-		_log("Заряжаем: %s" % Ammo.get_type(player_ship.current_ammo)["name"])
+		_log("Loading: %s" % Ammo.get_type(player_ship.current_ammo)["name"])
 
 	var p_speed: float = Sailing.ship_speed(player_ship, wind["from"], wind["strength"], nav)
 	var turn: float = Sailing.turn_speed(player_ship, p_speed, nav)
@@ -185,7 +185,7 @@ func _physics_process(delta: float) -> void:
 	player_node.bob(_time, 0.0)
 	Combat.tick_reload(player_ship, delta, cann)
 
-	# --- Стрельба игрока ---
+	# --- Player fire ---
 	var dist: float = player_node.position.distance_to(enemy_node.position)
 	if Input.is_action_just_pressed("fire_left"):
 		_try_player_fire(dist, -1)
@@ -194,14 +194,14 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("board_enemy"):
 		_try_boarding(dist)
 
-	# --- Враг ---
+	# --- Enemy ---
 	_enemy_ai(delta, dist, wind)
 
-	# --- Камера ---
+	# --- Camera ---
 	var back := Vector3(sin(deg_to_rad(player_ship.heading)), 0, -cos(deg_to_rad(player_ship.heading)))
-	var target_pos: Vector3 = player_node.position - back * 90.0 + Vector3(0, 45, 0)
+	var target_pos: Vector3 = player_node.position - back * 62.0 + Vector3(0, 26, 0)
 	camera.position = camera.position.lerp(target_pos, 2.5 * delta)
-	camera.look_at(player_node.position + Vector3(0, 10, 0))
+	camera.look_at(player_node.position + Vector3(0, 8, 0))
 
 	_update_hud(dist, p_speed)
 	_check_battle_end(dist)
@@ -213,11 +213,11 @@ func _move_ship(node: Node3D, heading: float, speed: float, delta: float) -> voi
 	node.rotation.y = -deg_to_rad(heading)
 
 
-## side: -1 левый борт, 1 правый.
+## side: -1 port, 1 starboard.
 func _in_arc(from_node: Node3D, heading: float, to_node: Node3D, side: int) -> bool:
 	var to_target := (to_node.position - from_node.position).normalized()
 	var fwd := Vector3(sin(deg_to_rad(heading)), 0, -cos(deg_to_rad(heading)))
-	var right := Vector3(fwd.z, 0, -fwd.x) * -1.0  # правый борт
+	var right := Vector3(fwd.z, 0, -fwd.x) * -1.0  # starboard side
 	return to_target.dot(right * side) > 0.35
 
 
@@ -225,20 +225,20 @@ func _try_player_fire(dist: float, side: int) -> void:
 	if player_ship.reload_progress < 1.0:
 		return
 	if not _in_arc(player_node, player_ship.heading, enemy_node, side):
-		_log("Цель не в секторе %s борта!" % ("левого" if side < 0 else "правого"))
+		_log("Target is outside the %s arc!" % ("port" if side < 0 else "starboard"))
 		return
 	var skills := {"accuracy": Game.state.character.skill("accuracy"), "cannons": Game.state.character.skill("cannons")}
 	var r: Dictionary = Combat.fire_broadside(player_ship, enemy_ship, dist, skills, Game.state.rng)
-	_report_broadside(r, "Наш залп", enemy_node)
+	_report_broadside(r, "Our broadside", enemy_node)
 
 
 func _report_broadside(r: Dictionary, who: String, target_node: Node3D) -> void:
 	if r["no_ammo"]:
-		_log("%s: нет зарядов!" % who)
+		_log("%s: out of shot!" % who)
 	elif r["out_of_range"]:
-		_log("%s: слишком далеко." % who)
+		_log("%s: out of range." % who)
 	elif r["fired"] > 0:
-		_log("%s: %d орудий, %d попаданий." % [who, r["fired"], r["hits"]])
+		_log("%s: %d guns, %d hits." % [who, r["fired"], r["hits"]])
 		_spawn_shot_visuals(target_node, int(r["hits"]))
 
 
@@ -271,10 +271,10 @@ func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
 	var range_limit := Combat.max_range(enemy_ship.caliber, enemy_current_ammo)
 	var desired: float
 	if dist > range_limit * 0.75:
-		desired = bearing            # догоняем
+		desired = bearing            # chase
 		enemy_sail = 1.0
 	else:
-		# Становимся бортом: перпендикуляр к пеленгу, ближайший по повороту.
+		# Turn broadside-on: perpendicular to the bearing, whichever is closer.
 		var opt_a := wrapf(bearing + 90.0, 0.0, 360.0)
 		var opt_b := wrapf(bearing - 90.0, 0.0, 360.0)
 		var da := absf(wrapf(opt_a - enemy_heading, -180.0, 180.0))
@@ -292,7 +292,7 @@ func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
 	enemy_node.bob(_time, 2.1)
 	Combat.tick_reload(enemy_ship, delta, 3)
 
-	# Выбор заряда: далеко — ядра, близко и у нас много людей — картечь.
+	# Ammo choice: far — cannonballs; close with a crew advantage — grapeshot.
 	if dist < range_limit * 0.4 and enemy_ship.crew > player_ship.crew:
 		enemy_current_ammo = "grapeshot"
 	else:
@@ -304,13 +304,13 @@ func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
 			if _in_arc(enemy_node, enemy_heading, player_node, side):
 				var r: Dictionary = Combat.fire_broadside(enemy_ship, player_ship, dist, enemy_skills, Game.state.rng)
 				if r["fired"] > 0:
-					_report_broadside(r, "Вражеский залп", player_node)
+					_report_broadside(r, "Enemy broadside", player_node)
 				break
 
 
 func _try_boarding(dist: float) -> void:
 	if not Combat.can_board(dist / SPEED_SCALE, enemy_ship) and dist > 120.0:
-		_log("Для абордажа нужно подойти вплотную!")
+		_log("Close alongside to board!")
 		return
 	var c = Game.state.character
 	var att_skills := {"boarding": c.skill("boarding"), "fencing": c.skill("fencing")}
@@ -323,47 +323,47 @@ func _try_boarding(dist: float) -> void:
 		for a in lt["ammo"]:
 			player_ship.ammo_stock[a] = int(player_ship.ammo_stock.get(a, 0)) + int(lt["ammo"][a])
 		var outcome: Dictionary = Game.state.on_enemy_sunk(enemy_ship, enemy_nation)
-		_finish_battle("Абордаж удался! Захвачено %d зол. и груз. Потери: %d. Опыт +%d." % [
+		_finish_battle("Boarding successful! Seized %d gold and cargo. Losses: %d. XP +%d." % [
 			lt["gold"], res["att_losses"], outcome["xp"]])
 	else:
-		_log("Абордаж отбит! Потеряно %d человек." % res["att_losses"])
+		_log("Boarding repelled! Lost %d men." % res["att_losses"])
 		if player_ship.crew <= 0:
-			_defeat("Вся команда полегла в абордаже.")
+			_defeat("Your entire crew fell in the boarding action.")
 
 
 func _update_hud(dist: float, p_speed: float) -> void:
 	var wind: Dictionary = Game.state.wind
-	lbl_player.text = "%s (%s)\nКорпус: %d%%  Паруса: %d%%  Команда: %d\nЗаряд: %s (%d)  Паруса: %s  Скорость: %.1f узл." % [
+	lbl_player.text = "%s (%s)\nHull: %d%%  Sails: %d%%  Crew: %d\nAmmo: %s (%d)  Sails: %s  Speed: %.1f kn" % [
 		player_ship.custom_name, player_ship.spec()["name"],
 		int(player_ship.hull_frac() * 100), int(player_ship.sails_frac() * 100), player_ship.crew,
 		Ammo.get_type(player_ship.current_ammo)["name"], player_ship.ammo_stock.get(player_ship.current_ammo, 0),
-		["убраны", "половина", "полные"][int(player_ship.sail_setting * 2.0)], p_speed]
-	lbl_enemy.text = "%s (%s)\nКорпус: %d%%  Паруса: %d%%\nКоманда: %d  Дистанция: %d м" % [
+		["furled", "half", "full"][int(player_ship.sail_setting * 2.0)], p_speed]
+	lbl_enemy.text = "%s (%s)\nHull: %d%%  Sails: %d%%\nCrew: %d  Distance: %d m" % [
 		enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"],
 		int(enemy_ship.hull_frac() * 100), int(enemy_ship.sails_frac() * 100),
 		enemy_ship.crew, int(dist)]
-	lbl_wind.text = "Ветер: %d° / %.0f узл." % [int(wind["from"]), wind["strength"]]
+	lbl_wind.text = "Wind: %d° / %.0f kn" % [int(wind["from"]), wind["strength"]]
 	bar_reload.value = player_ship.reload_progress
 	if dist < 120.0 and not enemy_ship.is_sunk():
-		lbl_wind.text += "   [B — АБОРДАЖ!]"
+		lbl_wind.text += "   [B — BOARD!]"
 
 
 func _check_battle_end(dist: float) -> void:
 	if enemy_ship.is_sunk():
 		var outcome: Dictionary = Game.state.on_enemy_sunk(enemy_ship, enemy_nation)
-		var msg := "Противник идёт ко дну! Опыт +%d." % outcome["xp"]
+		var msg := "The enemy is going down! XP +%d." % outcome["xp"]
 		if outcome["level_up"]:
-			msg += " Новый уровень!"
+			msg += " Level up!"
 		for q in outcome["completed_quests"]:
-			msg += " Задание выполнено: %s." % q["title"]
+			msg += " Quest completed: %s." % q["title"]
 		_sink_visual(enemy_node)
 		_finish_battle(msg)
 	elif player_ship.is_sunk():
-		_defeat("Ваш корабль потоплен...")
+		_defeat("Your ship has been sunk...")
 	elif player_ship.is_crew_critical():
-		_defeat("Команды не осталось — корабль неуправляем.")
+		_defeat("Not enough crew left to handle the ship.")
 	elif dist > ESCAPE_DISTANCE:
-		_finish_battle("Вы оторвались от противника.")
+		_finish_battle("You broke away from the enemy.")
 
 
 func _sink_visual(node: Node3D) -> void:
@@ -377,7 +377,7 @@ func _finish_battle(msg: String) -> void:
 	_log(msg)
 	Game.save_game()
 	var dlg := AcceptDialog.new()
-	dlg.title = "Бой окончен"
+	dlg.title = "Battle over"
 	dlg.dialog_text = msg
 	dlg.confirmed.connect(func(): Game.goto_map())
 	dlg.canceled.connect(func(): Game.goto_map())
@@ -388,8 +388,8 @@ func _finish_battle(msg: String) -> void:
 func _defeat(msg: String) -> void:
 	battle_over = true
 	var dlg := AcceptDialog.new()
-	dlg.title = "Поражение"
-	dlg.dialog_text = msg + "\nИгра окончена. Загрузите сохранение или начните заново."
+	dlg.title = "Defeat"
+	dlg.dialog_text = msg + "\nGame over. Load a save or start anew."
 	dlg.confirmed.connect(func(): Game.goto_menu())
 	dlg.canceled.connect(func(): Game.goto_menu())
 	hud.add_child(dlg)

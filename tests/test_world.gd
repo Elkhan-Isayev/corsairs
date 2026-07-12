@@ -8,7 +8,7 @@ func _world() -> RefCounted:
 
 
 func test_archipelago_layout() -> void:
-	assert_eq(World.island_ids().size(), 7, "семь островов")
+	assert_eq(World.island_ids().size(), 7, "seven islands")
 	for id in World.island_ids():
 		var isl := World.island(id)
 		assert_true(World.NATIONS.has(isl["nation"]), id)
@@ -27,7 +27,7 @@ func test_default_wars() -> void:
 	assert_true(w.are_at_war("england", "spain"))
 	assert_true(w.are_at_war("england", "france"))
 	assert_false(w.are_at_war("england", "holland"))
-	assert_true(w.are_at_war("pirates", "england"), "пираты воюют со всеми")
+	assert_true(w.are_at_war("pirates", "england"), "pirates war with everyone")
 	assert_false(w.are_at_war("england", "england"))
 
 
@@ -42,17 +42,17 @@ func test_reputation_changes_clamped() -> void:
 func test_attack_hurts_victim_pleases_enemies() -> void:
 	var w := _world()
 	w.on_player_attacked("spain")
-	assert_eq(w.reputation("spain"), -15, "жертва злится")
-	assert_gt(w.reputation("england"), 0, "враг Испании доволен")
-	assert_eq(w.reputation("france"), 0, "нейтралу всё равно")
+	assert_eq(w.reputation("spain"), -15, "the victim is furious")
+	assert_gt(w.reputation("england"), 0, "Spain's enemy approves")
+	assert_eq(w.reputation("france"), 0, "a neutral does not care")
 
 
 func test_hostile_port_closed() -> void:
 	var w := _world()
 	assert_false(w.is_port_hostile("isla_muelle"))
 	w.player_reputation["spain"] = -31
-	assert_true(w.is_port_hostile("isla_muelle"), "порт закрыт при репутации < -30")
-	assert_false(w.is_port_hostile("oxbay"), "английский порт открыт")
+	assert_true(w.is_port_hostile("isla_muelle"), "the port closes below -30")
+	assert_false(w.is_port_hostile("oxbay"), "the English port stays open")
 
 
 func test_serialization_round_trip() -> void:

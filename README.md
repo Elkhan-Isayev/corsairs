@@ -8,9 +8,17 @@ An open-source, **built-from-scratch** remake in the spirit of *Sea Dogs II* («
 
 No original game assets are used — all code, game data, and "art" (procedural sailing ships, water shader) are written from zero.
 
-> 🇷🇺 [Читать по-русски](README.ru.md)
-
 ---
+
+## Screenshots
+
+| Sea battle | World map |
+|---|---|
+| ![Sea battle](docs/screenshots/battle.png) | ![World map](docs/screenshots/map.png) |
+
+| Port & governor quests | Main menu |
+|---|---|
+| ![Port](docs/screenshots/port.png) | ![Main menu](docs/screenshots/menu.png) |
 
 ## Features
 
@@ -92,6 +100,8 @@ tests/     custom headless test framework + unit & smoke tests
 scenes/    main_menu, world_map, port, sea (3D battle)
 scripts/   scene scripts + the Game autoload (scene routing)
 assets/    water shader
+tools/     screenshot capture script
+docs/      screenshots used by this README
 ```
 
 ### Design notes
@@ -106,7 +116,7 @@ assets/    water shader
 - [ ] On-deck fencing during boarding
 - [ ] Story campaign
 - [ ] Sound & music
-- [ ] Localization (EN — the UI is currently Russian, like the original 🙂)
+- [ ] Localization (RU and others — the UI is English)
 
 ## Legal
 
