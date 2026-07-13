@@ -62,7 +62,7 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 | `RMB` drag | Orbit the camera |
 | Wheel | Zoom |
 
-On the open sea: `W/S/A/D` to sail, `M` — sea chart, `E` — drop anchor at an island, `Enter` — take the helm (full-scale sailing; `Enter`/`Esc` returns to the map). In town: `WASD` to walk, `E` — enter buildings/board your ship, `Tab` — port menu.
+On the open sea: `W/S/A/D` to sail, `M` — sea chart, `E` — drop anchor at an island, `Enter` — dock when near an island, otherwise take the helm (full-scale sailing; `Enter`/`Esc` returns to the map). In town: `WASD` to walk, `E` — enter buildings/board your ship, `Tab` — port menu.
 
 ## Running the game
 

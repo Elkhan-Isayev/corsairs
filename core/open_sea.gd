@@ -45,6 +45,28 @@ static func dockable_island(pos: Vector3) -> String:
 	return ""
 
 
+## Solid footprint of an island (beach included) — ships cannot enter it.
+## Always smaller than ARRIVAL_RADIUS, so the docking prompt appears
+## before the hull ever touches the sand.
+static func island_radius(id: String) -> float:
+	return 62.0 + float(World.island(id)["tier"]) * 6.0
+
+
+## Keep a ship out of every island: push the point back to open water.
+static func push_out_of_islands(pos: Vector3) -> Vector3:
+	for id in World.island_ids():
+		var isl := island_pos(id)
+		var away := pos - isl
+		away.y = 0.0
+		var r := island_radius(id)
+		if away.length() < r:
+			if away.length() < 0.01:
+				away = Vector3(1, 0, 0)
+			var fixed := isl + away.normalized() * r
+			pos = Vector3(fixed.x, pos.y, fixed.z)
+	return pos
+
+
 static func clamp_to_bounds(pos: Vector3) -> Vector3:
 	return Vector3(
 		clampf(pos.x, BOUNDS.position.x, BOUNDS.end.x),

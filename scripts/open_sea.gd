@@ -121,8 +121,8 @@ func _build_island(id: String) -> void:
 	to_center.y = 0.0
 	to_center = to_center.normalized()
 
-	# Beach base: a wide, flat sandy shelf.
-	var top_r: float = 42.0 + tier * 6.0
+	# Beach base: a wide, flat sandy shelf (2 units inside the collision ring).
+	var top_r: float = OpenSea.island_radius(id) - 20.0
 	var base := MeshInstance3D.new()
 	var bm := CylinderMesh.new()
 	bm.top_radius = top_r
@@ -364,7 +364,8 @@ func _sail(delta: float) -> void:
 
 	var fwd := Vector3(sin(deg_to_rad(_heading)), 0, -cos(deg_to_rad(_heading)))
 	var moved: Vector3 = fwd * speed * SPEED_SCALE * delta
-	_ship_node.position = OpenSea.clamp_to_bounds(_ship_node.position + moved)
+	_ship_node.position = OpenSea.push_out_of_islands(
+		OpenSea.clamp_to_bounds(_ship_node.position + moved))
 	_ship_node.rotation.y = -deg_to_rad(_heading)
 	_ship_node.set_sail_amount(maxf(ship.sail_setting, 0.06))
 	_ship_node.set_speed_visual(speed)
@@ -384,7 +385,7 @@ func _sail(delta: float) -> void:
 		if Game.state.world.is_port_hostile(dock_id):
 			_hint.text = "%s: the port is closed to you (reputation)" % isl["name"]
 		else:
-			_hint.text = "[E]  Drop anchor at %s" % isl["name"]
+			_hint.text = "[E / Enter]  Drop anchor at %s" % isl["name"]
 			if Input.is_action_just_pressed("interact"):
 				_dock(dock_id)
 	else:
@@ -452,7 +453,8 @@ func _update_npcs(delta: float) -> void:
 
 		var h := deg_to_rad(float(n["heading"]))
 		var fwd := Vector3(sin(h), 0, -cos(h))
-		node.position = OpenSea.clamp_to_bounds(node.position + fwd * float(n["speed"]) * delta)
+		node.position = OpenSea.push_out_of_islands(
+			OpenSea.clamp_to_bounds(node.position + fwd * float(n["speed"]) * delta))
 		node.rotation.y = -h
 		node.bob(_time, node.position.x * 0.1)
 		node.position.y = -0.5
@@ -514,9 +516,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.physical_keycode == KEY_ESCAPE and _chart.visible:
 			_chart.visible = false
 		elif event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]:
-			# Take the helm: drop into deck-scale sailing right here.
-			Game.open_sea_ctx = {"pos": _ship_node.position, "heading": _heading}
-			Game.goto_free_sail()
+			# Near an open port Enter docks; otherwise it takes the helm.
+			var dock_id: String = OpenSea.dockable_island(_ship_node.position)
+			if dock_id != "" and not Game.state.world.is_port_hostile(dock_id):
+				_dock(dock_id)
+			else:
+				Game.open_sea_ctx = {"pos": _ship_node.position, "heading": _heading}
+				Game.goto_free_sail()
 
 
 ## Parchment overlay: the archipelago chart with the player's position.

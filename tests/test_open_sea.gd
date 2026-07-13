@@ -27,6 +27,31 @@ func test_dockable_only_within_radius() -> void:
 	assert_eq(OpenSea.dockable_island(isl + Vector3(OpenSea.ARRIVAL_RADIUS + 40.0, 0, 0)), "", "too far out")
 
 
+func test_island_collision_radius() -> void:
+	for id in World.island_ids():
+		assert_lt(OpenSea.island_radius(id), OpenSea.ARRIVAL_RADIUS,
+			"%s: docking prompt must appear before the hull touches sand" % id)
+
+
+func test_push_out_of_islands() -> void:
+	var isl := OpenSea.island_pos("oxbay")
+	var r := OpenSea.island_radius("oxbay")
+	# Dead center: pushed out to the beach line.
+	var out := OpenSea.push_out_of_islands(isl)
+	assert_almost_eq(out.distance_to(isl), r, 0.1, "center pushed to the shore")
+	# Just inside: pushed to exactly the radius.
+	var inside := isl + Vector3(r - 5.0, 0, 0)
+	out = OpenSea.push_out_of_islands(inside)
+	assert_almost_eq(out.distance_to(isl), r, 0.1)
+	# Open water stays put.
+	var free := isl + Vector3(r + 40.0, 0, 0)
+	assert_eq(OpenSea.push_out_of_islands(free), free)
+	# No departure point may sit inside land.
+	for id in World.island_ids():
+		var p := OpenSea.departure_pos(id)
+		assert_eq(OpenSea.push_out_of_islands(p), p, "%s: departure point is open water" % id)
+
+
 func test_clamp_to_bounds() -> void:
 	var p := OpenSea.clamp_to_bounds(Vector3(-9999, 0, 9999))
 	assert_between(p.x, OpenSea.BOUNDS.position.x, OpenSea.BOUNDS.end.x)
