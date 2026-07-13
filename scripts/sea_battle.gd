@@ -22,9 +22,20 @@ var enemy_current_ammo := "balls"
 
 var player_node: Node3D
 var enemy_node: Node3D
+var player_len := 25.0
+var enemy_len := 25.0
 var camera: Camera3D
 var battle_over := false
 var _time := 0.0
+
+# Boarding minigame state (empty dict = not boarding).
+var _boarding := {}
+var _board_layer: CanvasLayer
+var _board_log: RichTextLabel
+var _board_bar_att: ProgressBar
+var _board_bar_def: ProgressBar
+var _board_btn: Button
+var _board_title: Label
 
 # Orbit camera (RMB drag to rotate, wheel to zoom).
 var cam_yaw := 0.0
@@ -162,7 +173,9 @@ func _build_ships() -> void:
 	player_node = Node3D.new()
 	player_node.set_script(ShipVisualScript)
 	add_child(player_node)
-	player_node.build(_visual_length(player_ship), _flag_color(Game.state.character.nation))
+	player_len = _visual_length(player_ship)
+	enemy_len = _visual_length(enemy_ship)
+	player_node.build(player_len, _flag_color(Game.state.character.nation))
 	player_node.position = Vector3(0, 0, 0)
 	player_ship.heading = 0.0
 	player_ship.sail_setting = 0.5
@@ -171,7 +184,7 @@ func _build_ships() -> void:
 	enemy_node = Node3D.new()
 	enemy_node.set_script(ShipVisualScript)
 	add_child(enemy_node)
-	enemy_node.build(_visual_length(enemy_ship), _flag_color(enemy_nation))
+	enemy_node.build(enemy_len, _flag_color(enemy_nation))
 	enemy_node.position = Vector3(250, 0, -450)
 	enemy_heading = 180.0
 	enemy_ship.reload_progress = 1.0
@@ -227,6 +240,9 @@ func _log(msg: String) -> void:
 func _physics_process(delta: float) -> void:
 	if battle_over:
 		return
+	if not _boarding.is_empty():
+		_boarding_tick(delta)
+		return
 	_time += delta
 	var wind: Dictionary = Game.state.wind
 	var nav: int = Game.state.character.skill("navigation")
@@ -264,6 +280,17 @@ func _physics_process(delta: float) -> void:
 
 	# --- Enemy ---
 	_enemy_ai(delta, dist, wind)
+
+	# --- Hulls never overlap: push the ships apart ---
+	var min_d := (player_len + enemy_len) * 0.45
+	var between := player_node.position - enemy_node.position
+	between.y = 0.0
+	if between.length() < min_d and not enemy_ship.is_sunk():
+		var n := between.normalized() if between.length() > 0.01 else Vector3(1, 0, 0)
+		var push := (min_d - between.length()) * 0.5
+		player_node.position += n * push
+		enemy_node.position -= n * push
+		dist = player_node.position.distance_to(enemy_node.position)
 
 	# --- Camera: free orbit around the player's ship ---
 	var yr := deg_to_rad(cam_yaw)
@@ -379,14 +406,120 @@ func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
 				break
 
 
+## Boarding is a round-by-round minigame in an overlay, not an instant roll.
 func _try_boarding(dist: float) -> void:
+	if not _boarding.is_empty():
+		return
 	if not Combat.can_board(dist / SPEED_SCALE, enemy_ship) and dist > 120.0:
 		_log("Close alongside to board!")
 		return
+	_boarding = {
+		"t": 0.0, "round": 0, "done": false,
+		"att_start": player_ship.crew, "def_start": enemy_ship.crew,
+	}
+	_build_boarding_ui()
+
+
+func _build_boarding_ui() -> void:
+	if _board_layer != null:
+		_board_layer.queue_free()
+	_board_layer = CanvasLayer.new()
+	hud.add_child(_board_layer)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_board_layer.add_child(dim)
+
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.10, 0.14, 0.97)
+	style.border_color = Color("e8c872")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 24
+	style.content_margin_right = 24
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", style)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(680, 420)
+	panel.position = Vector2(300, 150)
+	_board_layer.add_child(panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+
+	_board_title = Label.new()
+	_board_title.text = "⚔ BOARDING — %s (%s)" % [enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"]]
+	_board_title.add_theme_font_size_override("font_size", 24)
+	_board_title.add_theme_color_override("font_color", Color("e8c872"))
+	_board_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_board_title)
+
+	var bars := HBoxContainer.new()
+	bars.add_theme_constant_override("separation", 24)
+	box.add_child(bars)
+	for side in ["att", "def"]:
+		var col := VBoxContainer.new()
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bars.add_child(col)
+		var name_lbl := Label.new()
+		name_lbl.text = "Our crew" if side == "att" else "Enemy crew"
+		name_lbl.add_theme_color_override("font_color", Color("81c784") if side == "att" else Color("e57373"))
+		col.add_child(name_lbl)
+		var bar := ProgressBar.new()
+		bar.custom_minimum_size = Vector2(0, 22)
+		bar.show_percentage = false
+		if side == "att":
+			bar.max_value = _boarding["att_start"]
+			bar.value = player_ship.crew
+			_board_bar_att = bar
+		else:
+			bar.max_value = _boarding["def_start"]
+			bar.value = enemy_ship.crew
+			_board_bar_def = bar
+		col.add_child(bar)
+
+	_board_log = RichTextLabel.new()
+	_board_log.bbcode_enabled = true
+	_board_log.scroll_following = true
+	_board_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_board_log.add_theme_color_override("default_color", Color("cfe3f5"))
+	_board_log.text = "Grappling hooks fly — the crews clash on deck!\n"
+	box.add_child(_board_log)
+
+	_board_btn = Button.new()
+	_board_btn.text = "..."
+	_board_btn.visible = false
+	box.add_child(_board_btn)
+
+
+func _boarding_tick(delta: float) -> void:
+	if _boarding.get("done", false):
+		return
+	_boarding["t"] = float(_boarding["t"]) + delta
+	if float(_boarding["t"]) < 0.55:
+		return
+	_boarding["t"] = 0.0
+	_boarding["round"] = int(_boarding["round"]) + 1
+
 	var c = Game.state.character
-	var att_skills := {"boarding": c.skill("boarding"), "fencing": c.skill("fencing")}
-	var res: Dictionary = Boarding.resolve(player_ship, att_skills, enemy_ship, enemy_skills, Game.state.rng)
-	if res["winner"] == "attacker":
+	var r: Dictionary = Boarding.fight_round(
+		player_ship.crew, c.skill("boarding"), c.skill("fencing"),
+		enemy_ship.crew, enemy_skills["boarding"], enemy_skills["fencing"], Game.state.rng)
+	player_ship.crew = maxi(player_ship.crew - r["att_losses"], 0)
+	enemy_ship.crew = maxi(enemy_ship.crew - r["def_losses"], 0)
+	_board_bar_att.value = player_ship.crew
+	_board_bar_def.value = enemy_ship.crew
+	_board_log.append_text("Round %d: we lose [color=#e57373]%d[/color], they lose [color=#81c784]%d[/color].\n" % [
+		_boarding["round"], r["att_losses"], r["def_losses"]])
+
+	var att_start: int = _boarding["att_start"]
+	var def_start: int = _boarding["def_start"]
+	if enemy_ship.crew <= int(def_start * 0.3) or enemy_ship.crew <= 0:
+		_boarding["done"] = true
 		var lt: Dictionary = Boarding.loot(enemy_ship, Game.state.rng)
 		c.earn(lt["gold"])
 		for g in lt["cargo"]:
@@ -394,12 +527,39 @@ func _try_boarding(dist: float) -> void:
 		for a in lt["ammo"]:
 			player_ship.ammo_stock[a] = int(player_ship.ammo_stock.get(a, 0)) + int(lt["ammo"][a])
 		var outcome: Dictionary = Game.state.on_enemy_sunk(enemy_ship, enemy_nation)
-		_finish_battle("Boarding successful! Seized %d gold and cargo. Losses: %d. XP +%d." % [
-			lt["gold"], res["att_losses"], outcome["xp"]])
-	else:
-		_log("Boarding repelled! Lost %d men." % res["att_losses"])
-		if player_ship.crew <= 0:
-			_defeat("Your entire crew fell in the boarding action.")
+		_board_log.append_text("\n[color=#e8c872]The enemy strikes their colors! Seized %d gold and the cargo. XP +%d.%s[/color]\n" % [
+			lt["gold"], outcome["xp"], " Level up!" if outcome["level_up"] else ""])
+		_board_btn.text = "⚓ Take the prize"
+		_board_btn.visible = true
+		for conn in _board_btn.pressed.get_connections():
+			_board_btn.pressed.disconnect(conn["callable"])
+		_board_btn.pressed.connect(func():
+			_board_layer.queue_free()
+			_board_layer = null
+			_finish_battle("Prize taken! The battle is won."))
+	elif player_ship.crew <= int(att_start * 0.3) or player_ship.crew <= 0:
+		_boarding["done"] = true
+		_board_log.append_text("\n[color=#e57373]We are driven back to our own deck![/color]\n")
+		if player_ship.crew <= 0 or player_ship.is_crew_critical():
+			_board_btn.text = "..."
+			_board_btn.visible = true
+			for conn in _board_btn.pressed.get_connections():
+				_board_btn.pressed.disconnect(conn["callable"])
+			_board_btn.pressed.connect(func():
+				_board_layer.queue_free()
+				_board_layer = null
+				_defeat("Too few hands left to sail the ship."))
+			_board_btn.text = "So it ends..."
+		else:
+			_board_btn.text = "Withdraw and fight on"
+			_board_btn.visible = true
+			for conn in _board_btn.pressed.get_connections():
+				_board_btn.pressed.disconnect(conn["callable"])
+			_board_btn.pressed.connect(func():
+				_board_layer.queue_free()
+				_board_layer = null
+				_boarding = {}
+				_log("Boarding repelled — we pull away."))
 
 
 func _update_hud(dist: float, p_speed: float) -> void:

@@ -194,7 +194,8 @@ func _refresh_status() -> void:
 func _show_last_log() -> void:
 	var log: Dictionary = Game.last_sail_log
 	if log.is_empty():
-		_log_label.text = "Pick an island to set sail."
+		var here: String = World.island(Game.state.current_island)["name"] if Game.state.current_island != "" else "the open sea"
+		_log_label.text = "Departing from %s — click a destination island." % here
 		return
 	var lines: Array = ["The passage took %d day(s). Wages paid: %d gold." % [log["days"], log["wages_paid"]]]
 	if int(log.get("starved", 0)) > 0:

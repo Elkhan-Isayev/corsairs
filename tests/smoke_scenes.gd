@@ -19,7 +19,10 @@ func _process(_delta: float) -> bool:
 	if _frames % 20 != 0:
 		return false
 	var game = root.get_node("Game")
-	match _step:
+	# Advance BEFORE running the step so a crashing step can't loop forever.
+	var step := _step
+	_step += 1
+	match step:
 		0:
 			_check_scene("res://scenes/main_menu.tscn", "main_menu")
 			change_scene_to_file("res://scenes/main_menu.tscn")
@@ -50,7 +53,6 @@ func _process(_delta: float) -> bool:
 				print("FAIL: %s" % e)
 			print("SMOKE %s" % ("PASSED" if _errors.is_empty() else "FAILED"))
 			quit(0 if _errors.is_empty() else 1)
-	_step += 1
 	return false
 
 

@@ -114,7 +114,7 @@ func _build_port_tab() -> Control:
 	row.add_child(town)
 
 	var sail := Button.new()
-	sail.text = "⚓ Set sail (map)"
+	sail.text = "⚓ Depart from %s — choose destination" % isl["name"]
 	sail.pressed.connect(func(): Game.goto_map())
 	row.add_child(sail)
 
