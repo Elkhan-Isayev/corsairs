@@ -27,10 +27,21 @@ func _ready() -> void:
 	root.offset_bottom = -10
 	add_child(root)
 
+	# Header row: status text + an always-visible exit button.
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 16)
+	root.add_child(header_row)
+
 	_header = Label.new()
 	_header.add_theme_font_size_override("font_size", 22)
 	_header.add_theme_color_override("font_color", Color("e8c872"))
-	root.add_child(_header)
+	_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(_header)
+
+	var exit_btn := Button.new()
+	exit_btn.text = "🏘 Back to town (Esc)"
+	exit_btn.pressed.connect(func(): Game.goto_port())
+	header_row.add_child(exit_btn)
 
 	_tabs = TabContainer.new()
 	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -38,6 +49,11 @@ func _ready() -> void:
 
 	_generate_quest_offers()
 	_rebuild()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE:
+		Game.goto_port()
 
 
 func _island() -> Dictionary:
