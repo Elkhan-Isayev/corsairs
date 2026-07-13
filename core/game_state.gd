@@ -57,14 +57,38 @@ func sail_to(island_id: String) -> Dictionary:
 	if rng.randf() < encounter_chance:
 		log["encounter"] = _roll_encounter(island_id)
 
+	log["completed_quests"] = arrive(island_id)["completed_quests"]
+	return log
+
+
+# --- Open sea (the sailable world map) ---
+
+## Cast off: the ship is at sea until arrive() is called.
+func depart() -> void:
+	current_island = ""
+
+
+## One day passing on the open sea: wages, provisions, markets, wind.
+func sea_day() -> Dictionary:
+	var log := {"days": 1, "wages_paid": 0, "starved": 0}
+	_advance_day(log)
+	return log
+
+
+## Dock at an island reached on the open sea; completes delivery quests.
+func arrive(island_id: String) -> Dictionary:
 	current_island = island_id
 	var done: Array = quests.check_completion({"type": "arrived", "island": island_id}, day, ship)
 	for q in done:
 		character.earn(int(q["reward"]))
 		character.add_xp(int(q["reward"] / 4.0))
 		world.change_reputation(World.island(q["from"])["nation"], 5)
-	log["completed_quests"] = done
-	return log
+	return {"completed_quests": done}
+
+
+## A sail on the horizon: what ship cruises these waters.
+func roll_sea_encounter(near_island: String) -> Dictionary:
+	return _roll_encounter(near_island)
 
 
 func _advance_day(log: Dictionary) -> void:

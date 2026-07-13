@@ -50,7 +50,20 @@ func _process(_delta: float) -> bool:
 		240:
 			_capture("interior")
 		250:
-			change_scene_to_file("res://scenes/world_map.tscn")
+			var game = root.get_node("Game")
+			game.open_sea_ctx = {"from_island": "oxbay"}
+			game.state.depart()
+			change_scene_to_file("res://scenes/open_sea.tscn")
+		265:
+			# Stage the shot: full sails, two extra sails nearby, chase camera.
+			if current_scene != null and current_scene.name == "OpenSea":
+				var sea = current_scene
+				root.get_node("Game").state.ship.sail_setting = 1.0
+				sea._spawn_sail(90.0)
+				sea._spawn_sail(140.0)
+				sea.cam_yaw = 205.0
+				sea.cam_pitch = 24.0
+				sea.cam_dist = 95.0
 		300:
 			_capture("map")
 		320:

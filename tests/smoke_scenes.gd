@@ -35,9 +35,13 @@ func _process(_delta: float) -> bool:
 		3:
 			_expect(current_scene != null and current_scene.name == "PortTown", "port town opened")
 			_expect(current_scene.player != null, "town player built")
-			change_scene_to_file("res://scenes/world_map.tscn")
+			game.open_sea_ctx = {"from_island": "oxbay"}
+			game.state.depart()
+			change_scene_to_file("res://scenes/open_sea.tscn")
 		4:
-			_expect(current_scene != null and current_scene.name == "WorldMap", "map opened")
+			_expect(current_scene != null and current_scene.name == "OpenSea", "open sea opened")
+			_expect(current_scene._ship_node != null, "player mini ship built")
+			_expect(current_scene._npcs.size() > 0, "sails on the horizon")
 			game.pending_encounter = {"nation": "pirates", "ship_type": "sloop", "hostile": true}
 			change_scene_to_file("res://scenes/sea.tscn")
 		5:

@@ -193,7 +193,9 @@ func _build_terrain() -> void:
 		hm.radius = _rng.randf_range(60, 120)
 		hm.height = _rng.randf_range(40, 80)
 		hill.mesh = hm
-		hill.position = Vector3(_rng.randf_range(-220, 220), -8, _rng.randf_range(150, 260))
+		# Keep the near slope behind the town: no hill may reach past z = 90.
+		var hill_z: float = _rng.randf_range(90.0 + hm.radius, 200.0 + hm.radius)
+		hill.position = Vector3(_rng.randf_range(-220, 220), -8, hill_z)
 		var hmat := StandardMaterial3D.new()
 		hmat.albedo_color = Color("42592f").lerp(Color("5d7040"), _rng.randf())
 		hill.material_override = hmat
@@ -697,9 +699,9 @@ func _sail_tick(delta: float) -> void:
 		if Input.is_action_just_pressed("interact"):
 			_dock_ship()
 	elif far_out:
-		_hint.text = "[E]  Set sail for the open sea — world map"
+		_hint.text = "[E]  Set sail for the open sea"
 		if Input.is_action_just_pressed("interact"):
-			Game.goto_map()
+			Game.goto_open_sea_from_port()
 	else:
 		_hint.text = "W/S — sails, A/D — rudder | %.1f kn" % speed
 

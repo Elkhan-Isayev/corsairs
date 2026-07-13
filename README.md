@@ -10,9 +10,9 @@ No original game assets are used — all code, game data, and "art" (procedural 
 
 ## 🎮 Play now
 
-[![PLAY IN BROWSER](https://img.shields.io/badge/%E2%96%B6%20PLAY%20IN%20BROWSER-elkhan--isayev.github.io%2Fcorsairs-2ea44f?style=for-the-badge)](https://elkhan-isayev.github.io/corsairs/)
+<a href="https://elkhan-isayev.github.io/corsairs/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/%E2%96%B6%20PLAY%20IN%20BROWSER-elkhan--isayev.github.io%2Fcorsairs-2ea44f?style=for-the-badge" alt="PLAY IN BROWSER"></a>
 
-Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install needed, the web build is deployed to GitHub Pages automatically on every push.
+Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blank" rel="noopener noreferrer">https://elkhan-isayev.github.io/corsairs/</a>** — no install needed, the web build is deployed to GitHub Pages automatically on every push.
 
 ---
 
@@ -26,15 +26,15 @@ Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install need
 |---|---|
 | ![Boarding melee](docs/screenshots/boarding.png) | ![Tavern interior](docs/screenshots/interior.png) |
 
-| World map | Port menu |
+| The open sea (world map) | Port menu |
 |---|---|
-| ![World map](docs/screenshots/map.png) | ![Port menu](docs/screenshots/port.png) |
+| ![The open sea](docs/screenshots/map.png) | ![Port menu](docs/screenshots/port.png) |
 
 ## Features
 
 - 🌊 **3D naval combat** — sail physics with a real wind model (in irons / close-hauled / broad reach / running), broadside volleys, reload timing, enemy AI, boarding, sinking.
 - 💣 **Four ammo types** with distinct damage profiles, just like the original: **cannonballs** (hull), **chain shot** (sails), **grapeshot** (crew), **bombs** (heavy, short-ranged).
-- 🗺️ **World map** — a Caribbean archipelago of 7 islands held by four nations plus a pirate haven; voyages consume provisions and crew wages, with random encounters at sea.
+- 🗺️ **A sailable open sea** — the world map is a real 3D ocean, Sea Dogs style: steer your miniature ship between 7 islands held by four nations plus a pirate haven. Days pass as you sail (wages, provisions), other sails cruise the horizon — and the hostile ones will chase you straight into a 3D battle. Press `M` for the parchment sea chart, `E` to drop anchor at an island.
 - 💰 **Living economy** — 16 trade goods; every colony has its own exports (cheap) and imports (expensive), prices react to stock levels and your Trade skill. Trade routes are profitable — and there's a unit test proving it.
 - ⚔️ **RPG system** — 10 skills (Leadership, Fencing, Navigation, Accuracy, Cannons, Boarding, Defense, Repair, Trade, Luck), levels, and skill points.
 - 🏴 **Nations & reputation** — England, France, Spain, Holland, and the Pirates; wars, diplomatic fallout for sinking ships, ports that close to hostile captains.
@@ -62,6 +62,8 @@ Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install need
 | `RMB` drag | Orbit the camera |
 | Wheel | Zoom |
 
+On the open sea: `W/S/A/D` to sail, `M` — sea chart, `E` — drop anchor at an island. In town: `WASD` to walk, `E` — enter buildings/board your ship, `Tab` — port menu.
+
 ## Running the game
 
 You only need [Godot 4.x](https://godotengine.org/download) (free, ~100 MB, no install required).
@@ -78,7 +80,7 @@ Or open the folder in the Godot editor and hit **F5**.
 
 ## Tests
 
-The entire game core is covered by headless tests — **9 suites, ~960 assertions**, no window needed:
+The entire game core is covered by headless tests — **10 suites, ~1,100 assertions**, no window needed:
 
 ```bash
 godot --headless --path . -s tests/run_tests.gd     # core unit tests
@@ -117,7 +119,7 @@ core/      game logic — pure, scene-free, fully unit-tested
   quests.gd                 governor quests
   game_state.gd             aggregate state, voyages, encounters, save/load
 tests/     custom headless test framework + unit & smoke tests
-scenes/    main_menu, world_map, port, sea (3D battle)
+scenes/    main_menu, open_sea (sailable world map), port_town, port, sea (3D battle), boarding
 scripts/   scene scripts + the Game autoload (scene routing)
 assets/    water shader + generated music (WAV)
 tools/     screenshot capture + music synthesizer scripts
@@ -135,6 +137,7 @@ docs/      screenshots used by this README
 - [x] On-deck fencing during boarding — third-person melee with both crews fighting around you
 - [x] Walkable port towns with enterable buildings
 - [x] Harbor sailing: board your ship and sail the bay before heading to open sea
+- [x] Open-sea world map you actually sail, with encounters visible as ships
 - [ ] Squadrons & officers (Leadership already gates squadron size)
 - [ ] Story campaign
 - [ ] Sound & music
