@@ -35,15 +35,29 @@ func _process(_delta: float) -> bool:
 				current_scene.cam_dist = 22.0
 		190:
 			_capture("town")
-		210:
+		200:
+			# Step inside the tavern for an interior shot.
+			if current_scene != null and current_scene.name == "PortTown":
+				var town = current_scene
+				for it in town._interactables:
+					if String(it["label"]).begins_with("Enter the tavern"):
+						it["action"].call()
+						break
+				town.player.position += Vector3(0, 0, -3.0)
+				town.cam_yaw = 25.0
+				town.cam_pitch = 20.0
+				town.cam_dist = 7.0
+		240:
+			_capture("interior")
+		250:
 			change_scene_to_file("res://scenes/world_map.tscn")
-		260:
+		300:
 			_capture("map")
-		280:
+		320:
 			var game = root.get_node("Game")
 			game.pending_encounter = {"nation": "pirates", "ship_type": "brig", "hostile": true}
 			change_scene_to_file("res://scenes/sea.tscn")
-		290:
+		335:
 			# Full sails and a cinematic three-quarter camera angle.
 			if current_scene != null and current_scene.name == "SeaBattle":
 				current_scene.player_ship.sail_setting = 1.0

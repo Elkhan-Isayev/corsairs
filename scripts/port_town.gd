@@ -22,6 +22,13 @@ var _ship_node: Node3D
 var _interactables: Array = []
 ## Building footprints the player cannot walk through (XZ rects).
 var _colliders: Array = []   # Rect2: position = min corner (x, z)
+
+# Interiors: rooms are built far below the town; entering teleports there.
+var _interior_count := 0
+var _inside := false
+var _room_bounds := Rect2()
+var _room_floor_y := 0.0
+var _return_pos := Vector3.ZERO
 var _hint: Label
 var _rng := RandomNumberGenerator.new()
 
@@ -318,21 +325,23 @@ func _build_town() -> void:
 
 	# Special buildings with signs and interactions.
 	_special_building(Vector3(-26, 0, 12), Vector3(12, 7, 9), Color("b0765a"), "Tavern",
-		"Tavern — hire crew, quests", func(): Game.goto_port_ui(0))
+		"Tavern — hire crew, quests", "tavern", 0)
 	_special_building(Vector3(26, 0, 12), Vector3(12, 7, 9), Color("e6d3a8"), "Store",
-		"Store — trade goods", func(): Game.goto_port_ui(1))
+		"Store — trade goods", "store", 1)
 	_special_building(Vector3(52, 0, 2), Vector3(14, 6, 12), Color("c9b8a0"), "Shipyard",
-		"Shipyard — ships, ammo, repairs", func(): Game.goto_port_ui(2))
+		"Shipyard — ships, ammo, repairs", "shipyard", 2)
 	var gpos := Vector3(0, 0, 62)
 	_special_building(gpos, Vector3(18, 9, 12), Color("f2ede0"), "Governor",
-		"Governor — quests and audience", func(): Game.goto_port_ui(0))
+		"Governor — quests and audience", "governor", 0)
 	for cx in [-6.0, -2.0, 2.0, 6.0]:
 		_mesh_cyl(0.45, 0.45, 7.0, gpos + Vector3(cx, 3.5, -6.8), Color("f5f1e6"))
 
 
 ## A colonial house: timber-framed walls, windows with shutters, a door,
-## a roof with an overhang, sometimes a chimney. Registers a collider.
-func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof_c: Color = Color.TRANSPARENT) -> void:
+## a roof with an overhang, sometimes a chimney. Registers a collider and
+## builds an enterable interior behind its door.
+func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof_c: Color = Color.TRANSPARENT,
+		kind: String = "house", title: String = "the house", ui_tab: int = -1) -> void:
 	var wall: Color = wall_c if wall_c.a > 0.0 else WALL_COLORS[_rng.randi_range(0, WALL_COLORS.size() - 1)]
 	var roof: Color = roof_c if roof_c.a > 0.0 else ROOF_COLORS[_rng.randi_range(0, ROOF_COLORS.size() - 1)]
 
@@ -372,10 +381,18 @@ func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof
 
 	_colliders.append(Rect2(pos.x - size.x / 2.0 - 0.6, pos.z - size.z / 2.0 - 0.6, size.x + 1.2, size.z + 1.2))
 
+	# Every building is enterable: the door leads to a furnished room.
+	var room := _build_interior(kind, title, ui_tab)
+	_interactables.append({
+		"pos": pos + Vector3(0, 1.0, -size.z / 2.0 - 1.2),
+		"label": "Enter %s" % title,
+		"action": func(): _enter_interior(room),
+	})
+
 
 func _special_building(pos: Vector3, size: Vector3, wall: Color, sign_text: String,
-		hint: String, action: Callable) -> void:
-	_house(pos, size, wall)
+		hint: String, kind: String, ui_tab: int) -> void:
+	_house(pos, size, wall, Color.TRANSPARENT, kind, "the %s" % sign_text.to_lower(), ui_tab)
 	var sign := Label3D.new()
 	sign.text = sign_text
 	sign.font_size = 220
@@ -387,11 +404,6 @@ func _special_building(pos: Vector3, size: Vector3, wall: Color, sign_text: Stri
 	add_child(sign)
 	# A hanging wooden signboard by the door too.
 	_mesh_box(Vector3(1.6, 1.0, 0.1), pos + Vector3(size.x * 0.4, 3.2, -size.z / 2.0 - 0.4), Color("5d4024"))
-	_interactables.append({
-		"pos": pos + Vector3(0, 1.0, -size.z / 2.0 - 1.8),
-		"label": hint,
-		"action": action,
-	})
 
 
 ## Street furniture: lamp posts, a well, a market stall.
@@ -438,6 +450,172 @@ func _build_props() -> void:
 			Vector3(21.8 + (i % 2) * 2.4, 1.25, 17.8 + int(i / 2.0) * 1.4),
 			[Color("b0765a"), Color("6b7d4a"), Color("c9a24a"), Color("8d3a2e")][i])
 	_colliders.append(Rect2(20.0, 16.0, 6.0, 5.0))
+
+
+# --- Interiors ---
+
+## Build a furnished room for a building and return its entry data.
+## kind: "tavern" | "store" | "shipyard" | "governor" | "house"
+func _build_interior(kind: String, title: String, ui_tab: int) -> Dictionary:
+	var base := Vector3(300 + _interior_count * 50, -60, 0)
+	_interior_count += 1
+	var w := 13.0
+	var d := 10.0
+	var h := 4.2
+	var wall_c := Color("d9cfb8")
+	var floor_c := Color("6b5233")
+
+	# Shell: floor, ceiling, four walls.
+	_mesh_box(Vector3(w, 0.3, d), base + Vector3(0, -0.15, 0), floor_c)
+	_mesh_box(Vector3(w, 0.3, d), base + Vector3(0, h, 0), Color("3a2d1c"))
+	_mesh_box(Vector3(w, h, 0.3), base + Vector3(0, h / 2.0, -d / 2.0), wall_c)
+	_mesh_box(Vector3(w, h, 0.3), base + Vector3(0, h / 2.0, d / 2.0), wall_c)
+	_mesh_box(Vector3(0.3, h, d), base + Vector3(-w / 2.0, h / 2.0, 0), wall_c)
+	_mesh_box(Vector3(0.3, h, d), base + Vector3(w / 2.0, h / 2.0, 0), wall_c)
+	# Door mark on the front wall + glowing windows + warm light.
+	_mesh_box(Vector3(1.3, 2.5, 0.1), base + Vector3(0, 1.25, d / 2.0 - 0.12), Color("3a2513"))
+	for wx in [-w * 0.3, w * 0.3]:
+		_mesh_box(Vector3(1.4, 1.2, 0.1), base + Vector3(wx, 2.3, -d / 2.0 + 0.12), Color(1.0, 0.87, 0.6), true)
+	var light := OmniLight3D.new()
+	light.position = base + Vector3(0, h - 0.8, 0)
+	light.light_color = Color(1.0, 0.85, 0.62)
+	light.light_energy = 1.6
+	light.omni_range = 16.0
+	add_child(light)
+
+	_furnish(kind, base, w, d, ui_tab, title)
+
+	var spawn := base + Vector3(0, 0.1, d / 2.0 - 1.6)
+	_interactables.append({
+		"pos": base + Vector3(0, 1.0, d / 2.0 - 0.8),
+		"label": "Leave %s" % title,
+		"action": func(): _exit_interior(),
+	})
+	return {
+		"spawn": spawn,
+		"bounds": Rect2(base.x - w / 2.0 + 0.7, base.z - d / 2.0 + 0.7, w - 1.4, d - 1.4),
+		"floor_y": base.y,
+	}
+
+
+func _furnish(kind: String, base: Vector3, w: float, d: float, ui_tab: int, title: String) -> void:
+	match kind:
+		"tavern":
+			# Bar counter, kegs, tables with stools, a fireplace.
+			_mesh_box(Vector3(0.9, 1.1, d * 0.55), base + Vector3(w / 2.0 - 1.3, 0.55, 0), Color("4a2e15"))
+			for i in 3:
+				_mesh_cyl(0.42, 0.46, 1.0, base + Vector3(w / 2.0 - 0.7, 0.5, -d * 0.28 + i * 1.4), Color("5d4024"))
+			for tp in [Vector3(-2.5, 0, 1.2), Vector3(-3.2, 0, -2.2), Vector3(1.2, 0, -1.6)]:
+				_table_with_stools(base + tp)
+			_fireplace(base + Vector3(-w / 2.0 + 0.7, 0, -d * 0.2))
+			_room_npc(base + Vector3(w / 2.0 - 2.4, 0, 0), Color("8d3a2e"),
+				"Barkeeper — crew, quests & rumors", ui_tab)
+		"store":
+			for sx in [-w * 0.28, w * 0.05]:
+				_shelf(base + Vector3(sx, 0, -d / 2.0 + 0.9))
+			_mesh_box(Vector3(2.6, 1.05, 0.8), base + Vector3(w * 0.28, 0.52, 0.5), Color("4a2e15"))
+			for i in 5:
+				_mesh_box(Vector3(0.7, 0.7, 0.7),
+					base + Vector3(-w * 0.3 + i * 0.9, 0.35, d * 0.28),
+					[Color("b0765a"), Color("6b7d4a"), Color("c9a24a"), Color("8d3a2e"), Color("35405c")][i])
+			_room_npc(base + Vector3(w * 0.28, 0, -0.6), Color("6b7d4a"),
+				"Merchant — buy & sell goods", ui_tab)
+		"shipyard":
+			for i in 3:
+				var log := _mesh_cyl(0.28, 0.28, 5.0, base + Vector3(-w * 0.25, 0.3 + i * 0.5, -d * 0.3 + i * 0.1), Color("6b4a2b"))
+				log.rotation_degrees = Vector3(0, 0, 90)
+			_mesh_box(Vector3(3.2, 0.9, 1.2), base + Vector3(w * 0.22, 0.45, -d * 0.25), Color("4a2e15"))
+			_mesh_box(Vector3(0.5, 0.5, 2.6), base + Vector3(w * 0.22, 1.15, -d * 0.25), Color("8a6a3f"))
+			for i in 4:
+				_mesh_cyl(0.3, 0.34, 0.8, base + Vector3(-w * 0.15 + i * 1.1, 0.4, d * 0.28), Color("5d4024"))
+			_room_npc(base + Vector3(w * 0.22, 0, 0.8), Color("35405c"),
+				"Shipwright — ships, ammo & repairs", ui_tab)
+		"governor":
+			_mesh_box(Vector3(w * 0.6, 0.06, d * 0.5), base + Vector3(0, 0.03, 0), Color("7a2c2c"))
+			_mesh_box(Vector3(2.8, 0.9, 1.3), base + Vector3(0, 0.45, -d * 0.22), Color("4a2e15"))
+			_mesh_box(Vector3(0.7, 1.3, 0.7), base + Vector3(0, 0.65, -d * 0.36), Color("6e3a28"))
+			for cx in [-w * 0.3, w * 0.3]:
+				_mesh_cyl(0.35, 0.4, 4.0, base + Vector3(cx, 2.0, -d * 0.1), Color("f0ece0"))
+			_shelf(base + Vector3(w * 0.32, 0, -d / 2.0 + 0.9))
+			_room_npc(base + Vector3(0, 0, -d * 0.16), Color("35405c"),
+				"Governor — quests and audience", ui_tab)
+		_:
+			# A commoner's home: bed, table, chest, sometimes someone in.
+			_mesh_box(Vector3(2.2, 0.5, 1.2), base + Vector3(-w * 0.28, 0.25, -d * 0.3), Color("6e3a28"))
+			_mesh_box(Vector3(0.6, 0.18, 1.0), base + Vector3(-w * 0.36, 0.6, -d * 0.3), Color("e8e2d0"))
+			_table_with_stools(base + Vector3(w * 0.15, 0, 0.4))
+			_mesh_box(Vector3(1.1, 0.7, 0.7), base + Vector3(w * 0.3, 0.35, -d * 0.32), Color("5d4024"))
+			_fireplace(base + Vector3(-w / 2.0 + 0.7, 0, d * 0.15))
+			if _rng.randf() < 0.6:
+				_room_npc(base + Vector3(w * 0.1, 0, -d * 0.15),
+					NPC_CLOTHES[_rng.randi_range(0, NPC_CLOTHES.size() - 1)], "", -1)
+
+
+func _table_with_stools(pos: Vector3) -> void:
+	_mesh_cyl(0.8, 0.8, 0.08, pos + Vector3(0, 0.78, 0), Color("8a6a3f"))
+	_mesh_cyl(0.09, 0.11, 0.76, pos + Vector3(0, 0.38, 0), Color("4a2e15"))
+	for i in 3:
+		var ang := TAU * i / 3.0 + 0.5
+		_mesh_cyl(0.26, 0.26, 0.45, pos + Vector3(cos(ang) * 1.15, 0.22, sin(ang) * 1.15), Color("5d4024"))
+
+
+func _shelf(pos: Vector3) -> void:
+	_mesh_box(Vector3(3.0, 2.4, 0.5), pos + Vector3(0, 1.2, 0), Color("4a2e15"))
+	for row in 3:
+		for i in 4:
+			_mesh_box(Vector3(0.45, 0.4, 0.4),
+				pos + Vector3(-1.1 + i * 0.75, 0.55 + row * 0.75, -0.1),
+				NPC_CLOTHES[(row * 4 + i) % NPC_CLOTHES.size()])
+
+
+func _fireplace(pos: Vector3) -> void:
+	_mesh_box(Vector3(1.6, 2.2, 0.9), pos + Vector3(0, 1.1, 0), Color("6e6257"))
+	_mesh_box(Vector3(0.9, 0.8, 0.5), pos + Vector3(0, 0.5, 0.25), Color(1.0, 0.55, 0.15), true)
+
+
+## A static NPC standing in a room; optional Talk interaction opens a UI tab.
+func _room_npc(pos: Vector3, cloth: Color, talk_label: String, ui_tab: int) -> void:
+	var npc := Node3D.new()
+	npc.position = pos
+	npc.rotation.y = PI  # face the door
+	add_child(npc)
+	var torso := MeshInstance3D.new()
+	var tc := CapsuleMesh.new()
+	tc.radius = 0.21
+	tc.height = 1.1
+	torso.mesh = tc
+	torso.position = Vector3(0, 0.95, 0)
+	torso.material_override = _mat(cloth)
+	npc.add_child(torso)
+	var head := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 0.145
+	hm.height = 0.29
+	head.mesh = hm
+	head.position = Vector3(0, 1.68, 0)
+	head.material_override = _mat(Color("d9a97a"))
+	npc.add_child(head)
+	if talk_label != "":
+		_interactables.append({
+			"pos": pos + Vector3(0, 1.0, 0),
+			"label": talk_label,
+			"action": func(): Game.goto_port_ui(ui_tab),
+		})
+
+
+func _enter_interior(room: Dictionary) -> void:
+	_return_pos = player.position
+	_inside = true
+	_room_bounds = room["bounds"]
+	_room_floor_y = room["floor_y"]
+	player.position = room["spawn"]
+	camera.position = player.position + Vector3(0, 3, 6)
+
+
+func _exit_interior() -> void:
+	_inside = false
+	player.position = _return_pos
+	camera.position = player.position + Vector3(0, 4, 10)
 
 
 # --- Townsfolk ---
@@ -783,13 +961,21 @@ func _physics_process(delta: float) -> void:
 		var right := Vector3(-fwd.z, 0, fwd.x)
 		var motion := (fwd * dir.y + right * dir.x) * WALK_SPEED * delta
 		player.position += motion
-		player.position.x = clampf(player.position.x, -70.0, 70.0)
-		player.position.z = clampf(player.position.z, -9.0, 80.0)
-		_resolve_collisions()
+		if _inside:
+			player.position.x = clampf(player.position.x, _room_bounds.position.x, _room_bounds.end.x)
+			player.position.z = clampf(player.position.z, _room_bounds.position.y, _room_bounds.end.y)
+		else:
+			player.position.x = clampf(player.position.x, -70.0, 70.0)
+			player.position.z = clampf(player.position.z, -9.0, 80.0)
+			_resolve_collisions()
 		player.rotation.y = atan2(-motion.x, -motion.z)
 
-	# Snap to the ground: quay top near the water, grass further in.
-	var target_y := 0.95 if player.position.z < 1.5 else 0.08
+	# Snap to the ground: room floor inside, quay top or grass outside.
+	var target_y: float
+	if _inside:
+		target_y = _room_floor_y + 0.08
+	else:
+		target_y = 0.95 if player.position.z < 1.5 else 0.08
 	player.position.y = lerpf(player.position.y, target_y, 12.0 * delta)
 
 	_animate_walk(delta)
@@ -800,11 +986,17 @@ func _physics_process(delta: float) -> void:
 		_ship_node.bob(_time, 0.7)
 		_ship_node.position.y += -0.8
 
-	# Orbit camera around the player.
+	# Orbit camera around the player (pulled in close indoors).
 	var yr2 := deg_to_rad(cam_yaw)
 	var pr := deg_to_rad(cam_pitch)
-	var off := Vector3(sin(yr2) * cos(pr), sin(pr), cos(yr2) * cos(pr)) * cam_dist
+	var eff_dist := minf(cam_dist, 6.5) if _inside else cam_dist
+	var off := Vector3(sin(yr2) * cos(pr), sin(pr), cos(yr2) * cos(pr)) * eff_dist
 	camera.position = camera.position.lerp(player.position + Vector3(0, 1.6, 0) + off, 10.0 * delta)
+	if _inside:
+		# Keep the camera inside the room walls.
+		camera.position.x = clampf(camera.position.x, _room_bounds.position.x + 0.3, _room_bounds.end.x - 0.3)
+		camera.position.z = clampf(camera.position.z, _room_bounds.position.y + 0.3, _room_bounds.end.y - 0.3)
+		camera.position.y = clampf(camera.position.y, _room_floor_y + 1.2, _room_floor_y + 3.6)
 	camera.look_at(player.position + Vector3(0, 1.8, 0))
 
 	# Nearest interactable within range.

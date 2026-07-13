@@ -43,7 +43,7 @@ func test_player_buy_full_flow() -> void:
 	var price: int = m.buy_price("rum", 1)
 	var spent: int = m.player_buy("rum", 10, c, ship, 1)
 	assert_eq(spent, price * 10)
-	assert_eq(c.gold, 1000 - spent)
+	assert_eq(c.gold, 50000 - spent)
 	assert_eq(ship.cargo["rum"], 10)
 	assert_eq(m.stock["rum"], stock_before - 10)
 
@@ -67,7 +67,7 @@ func test_player_sell_full_flow() -> void:
 	var price: int = m.sell_price("silk", 1)
 	var income: int = m.player_sell("silk", 20, c, ship, 1)
 	assert_eq(income, price * 20)
-	assert_eq(c.gold, 1000 + income)
+	assert_eq(c.gold, 50000 + income)
 	assert_false(ship.cargo.has("silk"))
 	assert_gt(m.stock["silk"], 0, "sold goods land in the warehouse")
 
@@ -77,7 +77,7 @@ func test_player_sell_without_cargo_fails() -> void:
 	var c = Character.create()
 	var ship = Ship.create("lugger")
 	assert_eq(m.player_sell("silk", 5, c, ship, 1), -1)
-	assert_eq(c.gold, 1000)
+	assert_eq(c.gold, 50000)
 
 
 func test_scarcity_raises_price() -> void:

@@ -6,7 +6,7 @@ const Character := preload("res://core/character.gd")
 func test_new_character() -> void:
 	var c = Character.create("Nicholas", "france")
 	assert_eq(c.level, 1)
-	assert_eq(c.gold, 1000)
+	assert_eq(c.gold, 50000, "arcade starting purse")
 	assert_eq(c.skill("navigation"), 1, "all skills start at 1")
 	assert_eq(c.free_skill_points, 0)
 	assert_eq(Character.SKILLS.size(), 10, "ten skills like the original")
@@ -52,11 +52,11 @@ func test_skill_cap() -> void:
 func test_gold_operations() -> void:
 	var c = Character.create()
 	assert_true(c.spend(600))
-	assert_eq(c.gold, 400)
-	assert_false(c.spend(401), "cannot go negative")
-	assert_eq(c.gold, 400)
+	assert_eq(c.gold, 49400)
+	assert_false(c.spend(49401), "cannot go negative")
+	assert_eq(c.gold, 49400)
 	c.earn(100)
-	assert_eq(c.gold, 500)
+	assert_eq(c.gold, 49500)
 
 
 func test_squadron_grows_with_leadership() -> void:
