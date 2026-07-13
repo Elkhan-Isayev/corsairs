@@ -10,6 +10,8 @@ var pending_encounter: Dictionary = {}
 var last_sail_log: Dictionary = {}
 ## Tab the port UI should open on (-1 = keep last).
 var port_tab: int = -1
+## Context for the on-deck boarding fight: {"enemy": Ship, "nation": String}
+var boarding_ctx: Dictionary = {}
 
 
 func new_game(captain_name: String, nation: String) -> void:
@@ -54,6 +56,12 @@ func goto_port_ui(tab: int = -1) -> void:
 func goto_sea_battle(encounter: Dictionary) -> void:
 	pending_encounter = encounter
 	get_tree().change_scene_to_file("res://scenes/sea.tscn")
+
+
+## Third-person melee on the enemy deck; the fight decides the encounter.
+func start_boarding(enemy: RefCounted, nation: String) -> void:
+	boarding_ctx = {"enemy": enemy, "nation": nation}
+	get_tree().change_scene_to_file("res://scenes/boarding.tscn")
 
 
 ## Sail from the map. Returns true if a sea battle started.

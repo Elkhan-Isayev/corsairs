@@ -5,9 +5,14 @@
 extends Node3D
 
 const World := preload("res://core/world.gd")
+const Sailing := preload("res://core/sailing.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
+const Person := preload("res://scripts/person.gd")
 
 const WALK_SPEED := 9.0
+const SAIL_SPEED_SCALE := 2.6
+const ANCHOR_POS := Vector3(22, -0.8, -48)
+const ANCHOR_ROT_Y := 65.0
 
 var player: Node3D
 var camera: Camera3D
@@ -29,6 +34,11 @@ var _inside := false
 var _room_bounds := Rect2()
 var _room_floor_y := 0.0
 var _return_pos := Vector3.ZERO
+
+# Harbor sailing: the player boards the ship and steers it around the bay.
+var _sailing := false
+var _ship_heading := 0.0
+var _ship_len := 25.0
 var _hint: Label
 var _rng := RandomNumberGenerator.new()
 
@@ -296,11 +306,17 @@ func _build_quay_and_ship() -> void:
 	_ship_node.set_script(ShipVisualScript)
 	add_child(_ship_node)
 	var rank: int = Game.state.ship.spec()["rank"]
-	_ship_node.build(18.0 + (8 - rank) * 5.0, Color(World.NATIONS[Game.state.character.nation]["color"]))
-	_ship_node.position = Vector3(22, -0.8, -48)
-	_ship_node.rotation_degrees = Vector3(0, 65, 0)
+	_ship_len = 18.0 + (8 - rank) * 5.0
+	_ship_node.build(_ship_len, Color(World.NATIONS[Game.state.character.nation]["color"]))
+	_ship_node.position = ANCHOR_POS
+	_ship_node.rotation_degrees = Vector3(0, ANCHOR_ROT_Y, 0)
 	_ship_node.set_sail_amount(0.06)
 
+	_interactables.append({
+		"pos": Vector3(14, 1.0, -9),
+		"label": "Board your ship",
+		"action": func(): _board_ship(),
+	})
 	_interactables.append({
 		"pos": Vector3(0, 1.0, -8),
 		"label": "Depart from %s — choose destination" % _island()["name"],
@@ -575,26 +591,14 @@ func _fireplace(pos: Vector3) -> void:
 
 ## A static NPC standing in a room; optional Talk interaction opens a UI tab.
 func _room_npc(pos: Vector3, cloth: Color, talk_label: String, ui_tab: int) -> void:
-	var npc := Node3D.new()
+	var person := Person.build(cloth, Color("d9a97a"), false, 0 if talk_label == "" else 1)
+	var npc: Node3D = person["root"]
 	npc.position = pos
 	npc.rotation.y = PI  # face the door
 	add_child(npc)
-	var torso := MeshInstance3D.new()
-	var tc := CapsuleMesh.new()
-	tc.radius = 0.21
-	tc.height = 1.1
-	torso.mesh = tc
-	torso.position = Vector3(0, 0.95, 0)
-	torso.material_override = _mat(cloth)
-	npc.add_child(torso)
-	var head := MeshInstance3D.new()
-	var hm := SphereMesh.new()
-	hm.radius = 0.145
-	hm.height = 0.29
-	head.mesh = hm
-	head.position = Vector3(0, 1.68, 0)
-	head.material_override = _mat(Color("d9a97a"))
-	npc.add_child(head)
+	# Arms resting slightly outward.
+	person["l_arm"].rotation.z = 0.18
+	person["r_arm"].rotation.z = -0.18
 	if talk_label != "":
 		_interactables.append({
 			"pos": pos + Vector3(0, 1.0, 0),
@@ -618,6 +622,88 @@ func _exit_interior() -> void:
 	camera.position = player.position + Vector3(0, 4, 10)
 
 
+# --- Harbor sailing ---
+
+func _board_ship() -> void:
+	_sailing = true
+	_ship_heading = wrapf(-ANCHOR_ROT_Y, 0.0, 360.0)
+	Game.state.ship.sail_setting = 0.5
+	Game.state.ship.heading = _ship_heading
+	# Put the captain on the quarterdeck; he now moves with the ship.
+	player.get_parent().remove_child(player)
+	_ship_node.add_child(player)
+	player.position = Vector3(0, _ship_node._deck_y(0.8) + 0.6, _ship_len * 0.30)
+	player.rotation.y = 0.0
+	cam_dist = 46.0
+	cam_pitch = 16.0
+	_hint.text = ""
+
+
+func _dock_ship() -> void:
+	_sailing = false
+	Game.state.ship.sail_setting = 0.0
+	_ship_node.set_sail_amount(0.06)
+	_ship_node.position = ANCHOR_POS
+	_ship_node.rotation_degrees = Vector3(0, ANCHOR_ROT_Y, 0)
+	# The captain steps back onto the quay.
+	_ship_node.remove_child(player)
+	add_child(player)
+	player.position = Vector3(14, 0.95, 2)
+	cam_dist = 15.0
+	Game.save_game()
+
+
+func _sail_tick(delta: float) -> void:
+	var ship = Game.state.ship
+	var wind: Dictionary = Game.state.wind
+	var nav: int = Game.state.character.skill("navigation")
+
+	if Input.is_action_just_pressed("sails_up"):
+		ship.sail_setting = clampf(ship.sail_setting + 0.5, 0.0, 1.0)
+	if Input.is_action_just_pressed("sails_down"):
+		ship.sail_setting = clampf(ship.sail_setting - 0.5, 0.0, 1.0)
+
+	ship.heading = _ship_heading
+	var speed: float = Sailing.ship_speed(ship, wind["from"], wind["strength"], nav)
+	var turn: float = Sailing.turn_speed(ship, speed, nav)
+	if Input.is_action_pressed("turn_left"):
+		_ship_heading = wrapf(_ship_heading - turn * delta, 0.0, 360.0)
+	if Input.is_action_pressed("turn_right"):
+		_ship_heading = wrapf(_ship_heading + turn * delta, 0.0, 360.0)
+
+	var fwd := Vector3(sin(deg_to_rad(_ship_heading)), 0, -cos(deg_to_rad(_ship_heading)))
+	_ship_node.position += fwd * speed * SAIL_SPEED_SCALE * delta
+	_ship_node.rotation.y = -deg_to_rad(_ship_heading)
+	# Keep the ship inside the bay (the quay wall and map edges).
+	_ship_node.position.x = clampf(_ship_node.position.x, -400.0, 400.0)
+	_ship_node.position.z = clampf(_ship_node.position.z, -700.0, -16.0)
+	_ship_node.set_sail_amount(maxf(ship.sail_setting, 0.06))
+	_ship_node.set_speed_visual(speed)
+	_ship_node.bob(_time, 0.7)
+	_ship_node.position.y += -0.8
+
+	# Camera orbits the ship.
+	var yr := deg_to_rad(cam_yaw)
+	var pr := deg_to_rad(cam_pitch)
+	var off := Vector3(sin(yr) * cos(pr), sin(pr), cos(yr) * cos(pr)) * maxf(cam_dist, 25.0)
+	camera.position = camera.position.lerp(_ship_node.position + Vector3(0, 8, 0) + off, 6.0 * delta)
+	camera.look_at(_ship_node.position + Vector3(0, 6, 0))
+
+	# Contextual hints: dock near the quay, or sail out to the open sea.
+	var near_dock: bool = _ship_node.position.distance_to(ANCHOR_POS) < 40.0
+	var far_out: bool = _ship_node.position.z < -260.0
+	if near_dock:
+		_hint.text = "[E]  Dock at the quay"
+		if Input.is_action_just_pressed("interact"):
+			_dock_ship()
+	elif far_out:
+		_hint.text = "[E]  Set sail for the open sea — world map"
+		if Input.is_action_just_pressed("interact"):
+			Game.goto_map()
+	else:
+		_hint.text = "W/S — sails, A/D — rudder | %.1f kn" % speed
+
+
 # --- Townsfolk ---
 
 ## Wandering NPCs: {root, l_leg, r_leg (may be null for skirts), target, speed, phase}
@@ -628,95 +714,16 @@ const NPC_CLOTHES := [Color("8d3a2e"), Color("6b7d4a"), Color("b0765a"), Color("
 
 func _build_npcs() -> void:
 	for i in 9:
-		var npc := Node3D.new()
-		add_child(npc)
 		var cloth: Color = NPC_CLOTHES[i % NPC_CLOTHES.size()]
 		var skin := Color("d9a97a").lerp(Color("8d6a4a"), _rng.randf() * 0.6)
 		var skirted := _rng.randf() < 0.45
-		var l_leg: Node3D = null
-		var r_leg: Node3D = null
-
-		if skirted:
-			var skirt := MeshInstance3D.new()
-			var sk := CylinderMesh.new()
-			sk.top_radius = 0.16
-			sk.bottom_radius = 0.34
-			sk.height = 0.95
-			skirt.mesh = sk
-			skirt.position = Vector3(0, 0.48, 0)
-			skirt.material_override = _mat(cloth)
-			npc.add_child(skirt)
-		else:
-			for leg in [["l", -0.10], ["r", 0.10]]:
-				var hip := Node3D.new()
-				hip.position = Vector3(leg[1], 0.78, 0)
-				npc.add_child(hip)
-				var shin := MeshInstance3D.new()
-				var lc := CylinderMesh.new()
-				lc.top_radius = 0.075
-				lc.bottom_radius = 0.065
-				lc.height = 0.74
-				shin.mesh = lc
-				shin.position = Vector3(0, -0.37, 0)
-				shin.material_override = _mat(Color("3a3226"))
-				hip.add_child(shin)
-				if leg[0] == "l":
-					l_leg = hip
-				else:
-					r_leg = hip
-
-		var torso := MeshInstance3D.new()
-		var tc := CapsuleMesh.new()
-		tc.radius = 0.20
-		tc.height = 0.78
-		torso.mesh = tc
-		torso.position = Vector3(0, 1.15, 0)
-		torso.material_override = _mat(cloth)
-		npc.add_child(torso)
-
-		var head := MeshInstance3D.new()
-		var hm := SphereMesh.new()
-		hm.radius = 0.14
-		hm.height = 0.28
-		head.mesh = hm
-		head.position = Vector3(0, 1.66, 0)
-		head.material_override = _mat(skin)
-		npc.add_child(head)
-
-		# Hat, headscarf or bare hair.
-		var roll := _rng.randf()
-		if roll < 0.4:
-			var brim := MeshInstance3D.new()
-			var bc := CylinderMesh.new()
-			bc.top_radius = 0.22
-			bc.bottom_radius = 0.22
-			bc.height = 0.05
-			brim.mesh = bc
-			brim.position = Vector3(0, 1.79, 0)
-			brim.material_override = _mat(Color("5d4024"))
-			npc.add_child(brim)
-		elif roll < 0.7:
-			var scarf := MeshInstance3D.new()
-			var scm := SphereMesh.new()
-			scm.radius = 0.15
-			scm.height = 0.22
-			scarf.mesh = scm
-			scarf.position = Vector3(0, 1.74, 0)
-			scarf.material_override = _mat(NPC_CLOTHES[(i + 3) % NPC_CLOTHES.size()])
-			npc.add_child(scarf)
-		else:
-			var hair := MeshInstance3D.new()
-			var hrm := SphereMesh.new()
-			hrm.radius = 0.145
-			hrm.height = 0.24
-			hair.mesh = hrm
-			hair.position = Vector3(0, 1.72, 0.04)
-			hair.material_override = _mat(Color("2a1a0c"))
-			npc.add_child(hair)
-
+		var person := Person.build(cloth, skin, skirted, _rng.randi_range(0, 2))
+		var npc: Node3D = person["root"]
+		add_child(npc)
 		npc.position = _npc_spot()
 		_npcs.append({
-			"root": npc, "l_leg": l_leg, "r_leg": r_leg,
+			"root": npc, "l_leg": person["l_leg"], "r_leg": person["r_leg"],
+			"l_arm": person["l_arm"], "r_arm": person["r_arm"],
 			"target": _npc_spot(), "speed": _rng.randf_range(1.6, 3.0), "phase": _rng.randf() * TAU,
 		})
 
@@ -754,6 +761,8 @@ func _process_npcs(delta: float) -> void:
 			n["r_leg"].rotation.x = -swing
 		else:
 			root.position.y = 0.08 + absf(sin(n["phase"])) * 0.05
+		n["l_arm"].rotation.x = -swing * 0.6
+		n["r_arm"].rotation.x = swing * 0.6
 
 
 # --- Player ---
@@ -943,6 +952,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	_time += delta
+	if _sailing:
+		_sail_tick(delta)
+		_process_npcs(delta)
+		return
 	# Movement relative to the camera yaw.
 	var dir := Vector2.ZERO
 	if Input.is_action_pressed("sails_up"):

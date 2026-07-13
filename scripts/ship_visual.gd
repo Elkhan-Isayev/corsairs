@@ -30,7 +30,7 @@ var _wood_mat: StandardMaterial3D
 var _sail_mat: StandardMaterial3D
 
 
-func build(p_length: float, p_flag: Color) -> void:
+func build(p_length: float, p_flag: Color, with_crew := true) -> void:
 	length = p_length
 	flag_color = p_flag
 	_root = Node3D.new()
@@ -46,7 +46,8 @@ func build(p_length: float, p_flag: Color) -> void:
 	_build_deck_guns()
 	_build_masts()
 	_build_bowsprit_and_jibs()
-	_build_crew()
+	if with_crew:
+		_build_crew()
 	_build_wake()
 
 

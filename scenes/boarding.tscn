@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://board00000001"]
+
+[ext_resource type="Script" path="res://scripts/boarding_deck.gd" id="1"]
+
+[node name="BoardingDeck" type="Node3D"]
+script = ExtResource("1")

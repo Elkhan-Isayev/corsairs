@@ -49,6 +49,16 @@ func _process(_delta: float) -> bool:
 			# Let the battle physics run a couple more seconds.
 			pass
 		7:
+			game.boarding_ctx = {
+				"enemy": load("res://core/game_state.gd").new_game("Foe", "pirates", 5).ship,
+				"nation": "pirates",
+			}
+			change_scene_to_file("res://scenes/boarding.tscn")
+		8:
+			_expect(current_scene != null and current_scene.name == "BoardingDeck", "boarding deck started")
+			_expect(current_scene.player != null and not current_scene.player.is_empty(), "captain spawned")
+			_expect(current_scene._fighters.size() > 0, "fighters spawned")
+		9:
 			for e in _errors:
 				print("FAIL: %s" % e)
 			print("SMOKE %s" % ("PASSED" if _errors.is_empty() else "FAILED"))

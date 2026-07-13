@@ -22,9 +22,13 @@ Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install need
 |---|---|
 | ![Sea battle](docs/screenshots/battle.png) | ![Port town](docs/screenshots/town.png) |
 
-| Tavern interior | World map |
+| Boarding melee | Tavern interior |
 |---|---|
-| ![Tavern interior](docs/screenshots/interior.png) | ![World map](docs/screenshots/map.png) |
+| ![Boarding melee](docs/screenshots/boarding.png) | ![Tavern interior](docs/screenshots/interior.png) |
+
+| World map | Port menu |
+|---|---|
+| ![World map](docs/screenshots/map.png) | ![Port menu](docs/screenshots/port.png) |
 
 ## Features
 
@@ -43,6 +47,8 @@ Direct link: **<https://elkhan-isayev.github.io/corsairs/>** — no install need
 - 🏘️ **Walkable 3D port towns** — stroll the quay past your anchored ship, barrels and palms; **every building is enterable**: furnished tavern, store, shipyard and governor's mansion with NPCs to talk to, plus commoners' homes. All procedural.
 - 🏃 **Living decks** — carriage guns and sailors wandering the deck of every ship.
 - 🕹️ **Arcade sailing** — the wind flavors your speed (±25% at most) but never stalls the ship; battles stay fast.
+- ⚔️ **Third-person boarding** — cross to the enemy deck and fight with your cutlass while both crews clash around you; win to take the prize.
+- ⛵ **Harbor mode** — board your ship at the quay, sail the bay past your own town, dock again or head for the open sea.
 
 ## Controls (sea battle)
 
@@ -126,8 +132,10 @@ docs/      screenshots used by this README
 
 ## Roadmap
 
+- [x] On-deck fencing during boarding — third-person melee with both crews fighting around you
+- [x] Walkable port towns with enterable buildings
+- [x] Harbor sailing: board your ship and sail the bay before heading to open sea
 - [ ] Squadrons & officers (Leadership already gates squadron size)
-- [ ] On-deck fencing during boarding
 - [ ] Story campaign
 - [ ] Sound & music
 - [ ] Localization (RU and others — the UI is English)

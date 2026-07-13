@@ -72,7 +72,21 @@ func _process(_delta: float) -> bool:
 				b._spawn_shot_visuals(b.enemy_node, 8)
 		572:
 			_capture("battle")
-		620:
+		590:
+			var game = root.get_node("Game")
+			game.boarding_ctx = {
+				"enemy": load("res://core/game_state.gd").new_game("Foe", "pirates", 5).ship,
+				"nation": "pirates",
+			}
+			change_scene_to_file("res://scenes/boarding.tscn")
+		600:
+			if current_scene != null and current_scene.name == "BoardingDeck":
+				current_scene.cam_yaw = 150.0
+				current_scene.cam_pitch = 32.0
+				current_scene.cam_dist = 14.0
+		660:
+			_capture("boarding")
+		700:
 			if not _done:
 				_done = true
 				print("SCREENSHOTS DONE")
