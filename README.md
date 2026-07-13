@@ -34,7 +34,7 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 
 - 🌊 **3D naval combat** — sail physics with a real wind model (in irons / close-hauled / broad reach / running), broadside volleys, reload timing, enemy AI, boarding, sinking.
 - 💣 **Four ammo types** with distinct damage profiles, just like the original: **cannonballs** (hull), **chain shot** (sails), **grapeshot** (crew), **bombs** (heavy, short-ranged).
-- 🗺️ **A sailable open sea** — the world map is a real 3D ocean, Sea Dogs style: steer your miniature ship between 7 islands held by four nations plus a pirate haven. Days pass as you sail (wages, provisions), other sails cruise the horizon — and the hostile ones will chase you straight into a 3D battle. Press `M` for the parchment sea chart, `E` to drop anchor at an island.
+- 🗺️ **A sailable open sea** — the world map is a real 3D ocean, Sea Dogs style: steer your miniature ship between 7 islands held by four nations plus a pirate haven. Days pass as you sail (wages, provisions), other sails cruise the horizon — and the hostile ones will chase you straight into a 3D battle. Press `M` for the parchment sea chart, `E` to drop anchor at an island, `Enter` to take the helm and sail the full-scale sea.
 - 💰 **Living economy** — 16 trade goods; every colony has its own exports (cheap) and imports (expensive), prices react to stock levels and your Trade skill. Trade routes are profitable — and there's a unit test proving it.
 - ⚔️ **RPG system** — 10 skills (Leadership, Fencing, Navigation, Accuracy, Cannons, Boarding, Defense, Repair, Trade, Luck), levels, and skill points.
 - 🏴 **Nations & reputation** — England, France, Spain, Holland, and the Pirates; wars, diplomatic fallout for sinking ships, ports that close to hostile captains.
@@ -62,7 +62,7 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 | `RMB` drag | Orbit the camera |
 | Wheel | Zoom |
 
-On the open sea: `W/S/A/D` to sail, `M` — sea chart, `E` — drop anchor at an island. In town: `WASD` to walk, `E` — enter buildings/board your ship, `Tab` — port menu.
+On the open sea: `W/S/A/D` to sail, `M` — sea chart, `E` — drop anchor at an island, `Enter` — take the helm (full-scale sailing; `Enter`/`Esc` returns to the map). In town: `WASD` to walk, `E` — enter buildings/board your ship, `Tab` — port menu.
 
 ## Running the game
 

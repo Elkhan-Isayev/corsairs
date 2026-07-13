@@ -77,6 +77,12 @@ func goto_sea_battle(encounter: Dictionary) -> void:
 	_change_scene("res://scenes/sea.tscn", "Battle stations!")
 
 
+## Deck-scale sailing with no enemy — Enter on the world map.
+func goto_free_sail() -> void:
+	pending_encounter = {}
+	_change_scene("res://scenes/sea.tscn", "Open waters")
+
+
 ## Third-person melee on the enemy deck; the fight decides the encounter.
 func start_boarding(enemy: RefCounted, nation: String) -> void:
 	boarding_ctx = {"enemy": enemy, "nation": nation}

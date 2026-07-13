@@ -1,5 +1,7 @@
 ## 3D sea battle: the player against an encounter ship.
 ## WASD — sails/rudder, Q/E — broadsides, R — ammo type, B — board.
+## With no pending encounter this is free sailing: just you and the sea
+## (Enter/Esc returns to the world map).
 extends Node3D
 
 const Sailing := preload("res://core/sailing.gd")
@@ -19,6 +21,9 @@ var enemy_skills := {"accuracy": 3, "cannons": 3, "boarding": 3, "fencing": 3}
 var enemy_heading := 0.0
 var enemy_sail := 1.0
 var enemy_current_ammo := "balls"
+
+## True when there is no enemy — sailing the deck-scale sea for its own sake.
+var free_sail := false
 
 var player_node: Node3D
 var enemy_node: Node3D
@@ -44,18 +49,25 @@ var bar_reload: ProgressBar
 
 
 func _ready() -> void:
-	Music.play_battle()
 	player_ship = Game.state.ship
 	var enc: Dictionary = Game.pending_encounter
-	enemy_ship = Game.state.spawn_encounter_ship(enc)
-	enemy_nation = enc["nation"]
+	free_sail = enc.is_empty()
+	if free_sail:
+		Music.play_theme()
+	else:
+		Music.play_battle()
+		enemy_ship = Game.state.spawn_encounter_ship(enc)
+		enemy_nation = enc["nation"]
 	_build_environment()
 	_build_ships()
 	_build_hud()
 	_start_ocean_ambience()
-	_log("Enemy: %s \"%s\" (%s). Wind %d°." % [
-		enemy_ship.spec()["name"], enemy_ship.custom_name,
-		World.NATIONS[enemy_nation]["name"], int(Game.state.wind["from"])])
+	if free_sail:
+		_log("Open waters. Wind %d°.  [Enter] — back to the world map." % int(Game.state.wind["from"]))
+	else:
+		_log("Enemy: %s \"%s\" (%s). Wind %d°." % [
+			enemy_ship.spec()["name"], enemy_ship.custom_name,
+			World.NATIONS[enemy_nation]["name"], int(Game.state.wind["from"])])
 
 
 func _build_environment() -> void:
@@ -154,6 +166,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and _orbiting:
 		cam_yaw = wrapf(cam_yaw - event.relative.x * 0.35, 0.0, 360.0)
 		cam_pitch = clampf(cam_pitch + event.relative.y * 0.25, 4.0, 70.0)
+	elif event is InputEventKey and event.pressed and not event.echo and free_sail:
+		# Only open waters can be left at will; battles must be finished.
+		# open_sea_ctx still holds the map position we came from.
+		if event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+			Game.goto_map()
 
 
 func _flag_color(nation: String) -> Color:
@@ -165,12 +182,15 @@ func _build_ships() -> void:
 	player_node.set_script(ShipVisualScript)
 	add_child(player_node)
 	player_len = _visual_length(player_ship)
-	enemy_len = _visual_length(enemy_ship)
+	if not free_sail:
+		enemy_len = _visual_length(enemy_ship)
 	player_node.build(player_len, _flag_color(Game.state.character.nation))
 	player_node.position = Vector3(0, 0, 0)
 	player_ship.heading = 0.0
 	player_ship.sail_setting = 0.5
 	player_ship.reload_progress = 1.0
+	if free_sail:
+		return
 
 	enemy_node = Node3D.new()
 	enemy_node.set_script(ShipVisualScript)
@@ -257,28 +277,29 @@ func _physics_process(delta: float) -> void:
 	player_node.set_speed_visual(p_speed)
 	Combat.tick_reload(player_ship, delta, cann)
 
-	# --- Player fire ---
-	var dist: float = player_node.position.distance_to(enemy_node.position)
-	if Input.is_action_just_pressed("fire_left"):
-		_try_player_fire(dist, -1)
-	if Input.is_action_just_pressed("fire_right"):
-		_try_player_fire(dist, 1)
-	if Input.is_action_just_pressed("board_enemy"):
-		_try_boarding(dist)
-
-	# --- Enemy ---
-	_enemy_ai(delta, dist, wind)
-
-	# --- Hulls never overlap: push the ships apart ---
-	var min_d := (player_len + enemy_len) * 0.45
-	var between := player_node.position - enemy_node.position
-	between.y = 0.0
-	if between.length() < min_d and not enemy_ship.is_sunk():
-		var n := between.normalized() if between.length() > 0.01 else Vector3(1, 0, 0)
-		var push := (min_d - between.length()) * 0.5
-		player_node.position += n * push
-		enemy_node.position -= n * push
+	# --- Player fire / enemy (skipped on open waters) ---
+	var dist: float = INF
+	if not free_sail:
 		dist = player_node.position.distance_to(enemy_node.position)
+		if Input.is_action_just_pressed("fire_left"):
+			_try_player_fire(dist, -1)
+		if Input.is_action_just_pressed("fire_right"):
+			_try_player_fire(dist, 1)
+		if Input.is_action_just_pressed("board_enemy"):
+			_try_boarding(dist)
+
+		_enemy_ai(delta, dist, wind)
+
+		# Hulls never overlap: push the ships apart.
+		var min_d := (player_len + enemy_len) * 0.45
+		var between := player_node.position - enemy_node.position
+		between.y = 0.0
+		if between.length() < min_d and not enemy_ship.is_sunk():
+			var n := between.normalized() if between.length() > 0.01 else Vector3(1, 0, 0)
+			var push := (min_d - between.length()) * 0.5
+			player_node.position += n * push
+			enemy_node.position -= n * push
+			dist = player_node.position.distance_to(enemy_node.position)
 
 	# --- Camera: free orbit around the player's ship ---
 	var yr := deg_to_rad(cam_yaw)
@@ -410,17 +431,23 @@ func _update_hud(dist: float, p_speed: float) -> void:
 		int(player_ship.hull_frac() * 100), int(player_ship.sails_frac() * 100), player_ship.crew,
 		Ammo.get_type(player_ship.current_ammo)["name"], player_ship.ammo_stock.get(player_ship.current_ammo, 0),
 		["furled", "half", "full"][int(player_ship.sail_setting * 2.0)], p_speed]
+	lbl_wind.text = "Wind: %d° / %.0f kn" % [int(wind["from"]), wind["strength"]]
+	bar_reload.value = player_ship.reload_progress
+	if free_sail:
+		lbl_enemy.text = ""
+		lbl_wind.text += "   [Enter — world map]"
+		return
 	lbl_enemy.text = "%s (%s)\nHull: %d%%  Sails: %d%%\nCrew: %d  Distance: %d m" % [
 		enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"],
 		int(enemy_ship.hull_frac() * 100), int(enemy_ship.sails_frac() * 100),
 		enemy_ship.crew, int(dist)]
-	lbl_wind.text = "Wind: %d° / %.0f kn" % [int(wind["from"]), wind["strength"]]
-	bar_reload.value = player_ship.reload_progress
 	if dist < 120.0 and not enemy_ship.is_sunk():
 		lbl_wind.text += "   [B — BOARD!]"
 
 
 func _check_battle_end(dist: float) -> void:
+	if free_sail:
+		return
 	if enemy_ship.is_sunk():
 		var outcome: Dictionary = Game.state.on_enemy_sunk(enemy_ship, enemy_nation)
 		var msg := "The enemy is going down! XP +%d." % outcome["xp"]

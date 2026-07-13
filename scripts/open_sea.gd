@@ -486,7 +486,7 @@ func _update_camera(delta: float) -> void:
 
 func _update_hud() -> void:
 	var s = Game.state
-	_status.text = "Day %d  |  %d gold  |  Provisions %d  |  Crew %d  |  Wind %d°, %d kn  |  M — sea chart" % [
+	_status.text = "Day %d  |  %d gold  |  Provisions %d  |  Crew %d  |  Wind %d°, %d kn  |  M — chart, Enter — helm" % [
 		s.day, s.character.gold, int(s.ship.cargo.get("provisions", 0)), s.ship.crew,
 		int(s.wind["from"]), int(s.wind["strength"])]
 	if _time > _log_until:
@@ -513,6 +513,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_chart.visible = not _chart.visible
 		elif event.physical_keycode == KEY_ESCAPE and _chart.visible:
 			_chart.visible = false
+		elif event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]:
+			# Take the helm: drop into deck-scale sailing right here.
+			Game.open_sea_ctx = {"pos": _ship_node.position, "heading": _heading}
+			Game.goto_free_sail()
 
 
 ## Parchment overlay: the archipelago chart with the player's position.

@@ -31,7 +31,7 @@ static func create(name := "Captain", p_nation := "england") -> RefCounted:
 	c.nation = p_nation
 	for s in SKILLS:
 		c.skills[s] = 1
-	c.gold = 50000
+	c.gold = 900000
 	return c
 
 
