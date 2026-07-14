@@ -178,7 +178,8 @@ func test_full_playthrough_smoke() -> void:
 	var rounds := 0
 	while not enemy.is_sunk() and rounds < 100:
 		rounds += 1
-		g.ship.reload_progress = 1.0
+		g.ship.reload_left = 1.0
+		g.ship.reload_right = 1.0
 		Combat.fire_broadside(g.ship, enemy, 120.0, {"accuracy": 3, "cannons": 3}, g.rng)
 		if Combat.can_board(50.0, enemy) and enemy.crew > 0 and rounds > 3:
 			var res: Dictionary = Boarding.resolve(g.ship, {"boarding": 3, "fencing": 3}, enemy, {}, g.rng)

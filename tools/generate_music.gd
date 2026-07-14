@@ -12,6 +12,8 @@ func _initialize() -> void:
 	print("theme.wav done")
 	_save(_render_battle(), "res://assets/music/battle.wav")
 	print("battle.wav done")
+	_save(_render_shanty(), "res://assets/music/shanty.wav")
+	print("shanty.wav done")
 	_save(_render_waves(), "res://assets/music/waves.wav")
 	print("waves.wav done")
 	quit(0)
@@ -143,24 +145,30 @@ const C5 := 523.25
 const D5 := 587.33
 const E5 := 659.26
 const C2 := 65.41
+const D2 := 73.42
+const FS3 := 185.0
+const B3 := 246.94
+const FS4 := 369.99
+const B4 := 493.88
 
 
-## Calm main theme: C major, 70 bpm, 16 bars.
+## Bright main theme: C major, 78 bpm, 16 bars — majors only, no minor
+## chord anywhere, so it cannot sound melancholic.
 ## Guitar-style broken chords, soft bass, and a pentatonic melody that only
 ## uses tones of the current chord — nothing can clash by construction.
 func _render_theme() -> PackedFloat32Array:
-	var bpm := 70.0
+	var bpm := 78.0
 	var beat := 60.0 / bpm
 	var bar := beat * 4.0
 	var total := bar * 16.0
 	var buf := PackedFloat32Array()
 	buf.resize(int(total * RATE))
 
-	# Two passes over: C  Am  F  G | C  Am  F  G(resolves back to C).
+	# Two passes over: C  F  C  G — all sunshine.
 	var chords := [
 		{"bass": C2, "arp": [C3, E3, G3, C4]},
-		{"bass": A1, "arp": [A2, C3, E3, A3]},
 		{"bass": F2, "arp": [F2, A2, C3, F3]},
+		{"bass": C2, "arp": [C3, E3, G3, C4]},
 		{"bass": G2, "arp": [G2, D3, G3, D4]},
 	]
 	# Gentle fingerpicking: low - mid - high - mid, twice a bar.
@@ -180,12 +188,12 @@ func _render_theme() -> PackedFloat32Array:
 	# Every long note is a tone of the chord sounding under it.
 	var phrase := [
 		[0.0, E4, 2.0], [2.0, G4, 1.5],                    # C
-		[4.0, A4, 2.0], [6.0, E4, 1.5],                    # Am
-		[8.0, C5, 2.0], [10.0, A4, 2.0],                   # F
-		[12.0, G4, 2.5],                                   # G
+		[4.0, A4, 2.0], [6.0, C5, 1.5],                    # F
+		[8.0, G4, 2.0], [10.0, E4, 2.0],                   # C
+		[12.0, D5, 2.5],                                   # G
 		[16.0, E5, 1.0], [17.0, D5, 1.0], [18.0, C5, 2.0], # C
-		[20.0, A4, 2.0], [22.0, C5, 1.5],                  # Am
-		[24.0, A4, 1.0], [25.0, G4, 1.0], [26.0, F4, 2.0], # F
+		[20.0, A4, 2.0], [22.0, F4, 1.5],                  # F
+		[24.0, G4, 1.0], [25.0, E4, 1.0], [26.0, G4, 2.0], # C
 		[28.0, D5, 2.0], [30.0, G4, 1.5],                  # G
 	]
 	# Pass 1: harp plucks.  Pass 2: a soft flute takes the same phrase.
@@ -196,6 +204,65 @@ func _render_theme() -> PackedFloat32Array:
 		var t: float = bar * 8.0 + float(note[0]) * beat
 		_lead(buf, t, float(note[2]) * beat, float(note[1]), 0.055)
 		_pluck(buf, t, float(note[1]) * 0.5, 0.035, 1.2)
+	return buf
+
+
+## Sea shanty for the open sea: D major jig, 100 bpm — oom-pah bass,
+## strummed chords, a jaunty pentatonic tune and a foot-stomp beat.
+func _render_shanty() -> PackedFloat32Array:
+	var bpm := 100.0
+	var beat := 60.0 / bpm
+	var bar := beat * 4.0
+	var total := bar * 16.0
+	var buf := PackedFloat32Array()
+	buf.resize(int(total * RATE))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+
+	# D  G  D  A, twice per pass: [bass, chord tones]
+	var prog := [
+		{"bass": D2, "chord": [D3, FS3, A3]},
+		{"bass": G2, "chord": [G3 / 2.0, B3 / 2.0, D3]},
+		{"bass": D2, "chord": [D3, FS3, A3]},
+		{"bass": A2 / 2.0, "chord": [A2, E3, A3]},
+	]
+	for b in 16:
+		var ch: Dictionary = prog[b % 4]
+		var t0 := b * bar
+		# Oom-pah: root on 1 and 3, fifth on 2 and 4.
+		for k in 4:
+			var f: float = float(ch["bass"]) if k % 2 == 0 else float(ch["bass"]) * 1.5
+			_tone(buf, t0 + k * beat, beat * 0.8, f, 0.10, 0.01, beat * 0.3, [1.0, 0.2])
+		# Quick strum roll on every beat.
+		for k in 4:
+			var chord: Array = ch["chord"]
+			for ci in chord.size():
+				_pluck(buf, t0 + k * beat + ci * 0.018, float(chord[ci]), 0.045, 0.28)
+		# Foot stomp on 1 and 3, clap on 2 and 4.
+		for k in 4:
+			if k % 2 == 0:
+				_tone(buf, t0 + k * beat, 0.14, 60.0, 0.15, 0.004, 0.11, [1.0])
+			else:
+				_noise_burst(buf, t0 + k * beat, 0.07, 0.045, rng)
+
+	# The tune: D major pentatonic, jig-like eighth runs. [beat, freq, dur].
+	var tune := [
+		[0.0, D4, 1.0], [1.0, E4, 0.5], [1.5, FS4, 0.5], [2.0, A4, 1.5],
+		[4.0, B4, 1.0], [5.0, A4, 0.5], [5.5, G4, 0.5], [6.0, D4 * 2.0, 1.5],
+		[8.0, A4, 1.0], [9.0, FS4, 0.5], [9.5, D4, 0.5], [10.0, FS4, 1.5],
+		[12.0, E4, 1.0], [13.0, A4, 1.0], [14.0, E4 * 2.0, 1.5],
+		[16.0, D4 * 2.0, 1.0], [17.0, B4, 0.5], [17.5, A4, 0.5], [18.0, FS4, 1.5],
+		[20.0, G4, 1.0], [21.0, B4, 1.0], [22.0, D4 * 2.0, 1.5],
+		[24.0, A4, 0.5], [24.5, B4, 0.5], [25.0, A4, 0.5], [25.5, FS4, 0.5], [26.0, D4, 1.5],
+		[28.0, E4, 1.0], [29.0, FS4 / 2.0 * 3.0, 1.0], [30.0, D4, 2.0],
+	]
+	for pass_i in 2:
+		for note in tune:
+			var t: float = pass_i * bar * 8.0 + float(note[0]) * beat
+			_pluck(buf, t, float(note[1]), 0.11, 0.5)
+			if pass_i == 1:
+				# Second pass: a fife doubles the tune an octave up.
+				_lead(buf, t, float(note[2]) * beat, float(note[1]) * 2.0, 0.028)
 	return buf
 
 

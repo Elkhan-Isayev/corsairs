@@ -22,11 +22,13 @@ static func hit_chance(distance: float, range_limit: float, accuracy_skill: int,
 	return clampf(base * skill, 0.0, 0.95)
 
 
-## Full broadside. Returns a report and applies damage to the target.
+## Full broadside from one side (-1 port, 1 starboard). Each side keeps its
+## own guns loaded: firing to port leaves the starboard battery ready.
+## Returns a report and applies damage to the target.
 ## attacker_skills: {"accuracy": int, "cannons": int}
-static func fire_broadside(attacker, target, distance: float, attacker_skills: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+static func fire_broadside(attacker, target, distance: float, attacker_skills: Dictionary, rng: RandomNumberGenerator, side: int = 1) -> Dictionary:
 	var report := {"fired": 0, "hits": 0, "hull_dmg": 0.0, "sail_dmg": 0.0, "crew_loss": 0, "cannons_lost": 0, "out_of_range": false, "no_ammo": false}
-	if attacker.reload_progress < 1.0:
+	if reload_progress(attacker, side) < 1.0:
 		return report
 	var guns: int = attacker.broadside_guns()
 	if guns <= 0:
@@ -42,7 +44,10 @@ static func fire_broadside(attacker, target, distance: float, attacker_skills: D
 		return report
 
 	attacker.ammo_stock[attacker.current_ammo] = stock - shots
-	attacker.reload_progress = 0.0
+	if side < 0:
+		attacker.reload_left = 0.0
+	else:
+		attacker.reload_right = 0.0
 	report["fired"] = shots
 
 	var ammo := Ammo.get_type(attacker.current_ammo)
@@ -72,10 +77,15 @@ static func reload_time(ship, cannons_skill: int) -> float:
 	return maxf(base * skill_factor / crew_factor, 5.0)
 
 
+## Both batteries reload in parallel at exactly the same rate.
 static func tick_reload(ship, delta: float, cannons_skill: int) -> void:
-	if ship.reload_progress >= 1.0:
-		return
-	ship.reload_progress = minf(ship.reload_progress + delta / reload_time(ship, cannons_skill), 1.0)
+	var step := delta / reload_time(ship, cannons_skill)
+	ship.reload_left = minf(ship.reload_left + step, 1.0)
+	ship.reload_right = minf(ship.reload_right + step, 1.0)
+
+
+static func reload_progress(ship, side: int) -> float:
+	return ship.reload_left if side < 0 else ship.reload_right
 
 
 ## Boarding is possible when the hulls are close and the target still floats.

@@ -38,7 +38,7 @@ var _chart: SeaChart
 
 
 func _ready() -> void:
-	Music.play_theme()
+	Music.play_shanty()
 	_build_environment()
 	_build_ocean()
 	for id in World.island_ids():

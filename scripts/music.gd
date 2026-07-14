@@ -36,6 +36,11 @@ func play_battle() -> void:
 	_play("res://assets/music/battle.wav", -8.0)
 
 
+## The jaunty sailing tune for the open sea and free sailing.
+func play_shanty() -> void:
+	_play("res://assets/music/shanty.wav", -9.0)
+
+
 func _play(path: String, target_db: float) -> void:
 	if _current_track == path and _active.playing:
 		return

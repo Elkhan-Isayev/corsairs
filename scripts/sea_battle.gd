@@ -46,6 +46,7 @@ var lbl_enemy: Label
 var lbl_wind: Label
 var lbl_log: Label
 var bar_reload: ProgressBar
+var bar_reload_r: ProgressBar
 
 
 func _ready() -> void:
@@ -53,7 +54,7 @@ func _ready() -> void:
 	var enc: Dictionary = Game.pending_encounter
 	free_sail = enc.is_empty()
 	if free_sail:
-		Music.play_theme()
+		Music.play_shanty()
 	else:
 		Music.play_battle()
 		enemy_ship = Game.state.spawn_encounter_ship(enc)
@@ -188,7 +189,8 @@ func _build_ships() -> void:
 	player_node.position = Vector3(0, 0, 0)
 	player_ship.heading = 0.0
 	player_ship.sail_setting = 0.5
-	player_ship.reload_progress = 1.0
+	player_ship.reload_left = 1.0
+	player_ship.reload_right = 1.0
 	if free_sail:
 		return
 
@@ -198,7 +200,8 @@ func _build_ships() -> void:
 	enemy_node.build(enemy_len, _flag_color(enemy_nation), true, enemy_ship.type_id)
 	enemy_node.position = Vector3(250, 0, -450)
 	enemy_heading = 180.0
-	enemy_ship.reload_progress = 1.0
+	enemy_ship.reload_left = 1.0
+	enemy_ship.reload_right = 1.0
 
 
 func _visual_length(ship: RefCounted) -> float:
@@ -226,12 +229,25 @@ func _build_hud() -> void:
 	lbl_wind.add_theme_color_override("font_color", Color("e8c872"))
 	hud.add_child(lbl_wind)
 
+	# One reload bar per battery: port on the left, starboard on the right.
 	bar_reload = ProgressBar.new()
 	bar_reload.position = Vector2(16, 660)
-	bar_reload.size = Vector2(260, 16)
+	bar_reload.size = Vector2(126, 16)
 	bar_reload.max_value = 1.0
 	bar_reload.show_percentage = false
 	hud.add_child(bar_reload)
+	bar_reload_r = ProgressBar.new()
+	bar_reload_r.position = Vector2(150, 660)
+	bar_reload_r.size = Vector2(126, 16)
+	bar_reload_r.max_value = 1.0
+	bar_reload_r.show_percentage = false
+	hud.add_child(bar_reload_r)
+	var lbl_bars := Label.new()
+	lbl_bars.position = Vector2(16, 678)
+	lbl_bars.text = "Q — port battery          E — starboard"
+	lbl_bars.add_theme_font_size_override("font_size", 12)
+	lbl_bars.add_theme_color_override("font_color", Color("9fb4c8"))
+	hud.add_child(lbl_bars)
 
 	lbl_log = Label.new()
 	lbl_log.position = Vector2(16, 596)
@@ -328,13 +344,16 @@ func _in_arc(from_node: Node3D, heading: float, to_node: Node3D, side: int) -> b
 
 
 func _try_player_fire(dist: float, side: int) -> void:
-	if player_ship.reload_progress < 1.0:
+	if Combat.reload_progress(player_ship, side) < 1.0:
+		_log("The %s battery is still reloading!" % ("port" if side < 0 else "starboard"))
 		return
 	if not _in_arc(player_node, player_ship.heading, enemy_node, side):
 		_log("Target is outside the %s arc!" % ("port" if side < 0 else "starboard"))
 		return
 	var skills := {"accuracy": Game.state.character.skill("accuracy"), "cannons": Game.state.character.skill("cannons")}
-	var r: Dictionary = Combat.fire_broadside(player_ship, enemy_ship, dist, skills, Game.state.rng)
+	var r: Dictionary = Combat.fire_broadside(player_ship, enemy_ship, dist, skills, Game.state.rng, side)
+	if int(r["fired"]) > 0:
+		player_node.fire_broadside_fx(side)
 	_report_broadside(r, "Our broadside", enemy_node)
 
 
@@ -406,13 +425,14 @@ func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
 		enemy_current_ammo = "balls"
 	enemy_ship.current_ammo = enemy_current_ammo
 
-	if enemy_ship.reload_progress >= 1.0:
-		for side in [-1, 1]:
-			if _in_arc(enemy_node, enemy_heading, player_node, side):
-				var r: Dictionary = Combat.fire_broadside(enemy_ship, player_ship, dist, enemy_skills, Game.state.rng)
-				if r["fired"] > 0:
-					_report_broadside(r, "Enemy broadside", player_node)
-				break
+	for side: int in [-1, 1]:
+		if Combat.reload_progress(enemy_ship, side) >= 1.0 \
+				and _in_arc(enemy_node, enemy_heading, player_node, side):
+			var r: Dictionary = Combat.fire_broadside(enemy_ship, player_ship, dist, enemy_skills, Game.state.rng, side)
+			if r["fired"] > 0:
+				enemy_node.fire_broadside_fx(side)
+				_report_broadside(r, "Enemy broadside", player_node)
+			break
 
 
 ## Boarding hands the encounter over to the on-deck melee scene.
@@ -432,7 +452,8 @@ func _update_hud(dist: float, p_speed: float) -> void:
 		Ammo.get_type(player_ship.current_ammo)["name"], player_ship.ammo_stock.get(player_ship.current_ammo, 0),
 		["furled", "half", "full"][int(player_ship.sail_setting * 2.0)], p_speed]
 	lbl_wind.text = "Wind: %d° / %.0f kn" % [int(wind["from"]), wind["strength"]]
-	bar_reload.value = player_ship.reload_progress
+	bar_reload.value = player_ship.reload_left
+	bar_reload_r.value = player_ship.reload_right
 	if free_sail:
 		lbl_enemy.text = ""
 		lbl_wind.text += "   [Enter — world map]"

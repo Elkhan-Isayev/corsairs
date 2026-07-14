@@ -29,6 +29,8 @@ var _depth: float
 
 var _wood_mat: StandardMaterial3D
 var _sail_mat: StandardMaterial3D
+## Muzzle positions per side (-1 port, 1 starboard) for volley smoke.
+var _gun_ports := {-1: [], 1: []}
 
 ## Rig & hull profile per ship class: mast count, rows of gunports,
 ## square-sail tiers per mast, stern castle stages, lateen rig for the
@@ -171,7 +173,9 @@ func _station(t: float, z: float, side: float, r: int) -> Vector3:
 	var yb := _bottom_y(t)
 	var yd := _deck_y(t)
 	var row: Array = ROWS[r]
-	return Vector3(side * w * row[0], yb + (yd - yb) * row[1], z)
+	# Raked transom: the upper stern leans aft, like a real counter-stern.
+	var rake: float = row[1] * length * 0.045 * smoothstep(0.88, 1.0, t)
+	return Vector3(side * w * row[0], yb + (yd - yb) * row[1], z + rake)
 
 
 func _build_hull() -> void:
@@ -210,15 +214,25 @@ func _build_hull() -> void:
 	mi.material_override = _wood_mat
 	_root.add_child(mi)
 
-	# Stem post with a small figurehead knob.
-	var stem := _cylinder(0.22, 0.3, _depth * 1.7, Vector3(0, _depth * 0.45, -length * 0.505), COLOR_UPPER)
-	stem.rotation_degrees = Vector3(18, 0, 0)
+	# Curved stem: a clipper-style sweep from the waterline up and forward
+	# to the figurehead — no straight-post bow.
+	var p0 := Vector3(0, -_depth * 0.15, -length * 0.487)
+	var p1 := Vector3(0, _depth * 0.55, -length * 0.552)   # curve control
+	var p2 := Vector3(0, _depth * 1.30, -length * 0.560)
+	var prev := p0
+	var segs := 5
+	for i in range(1, segs + 1):
+		var f := float(i) / segs
+		var pt := p0.lerp(p1, f).lerp(p1.lerp(p2, f), f)  # quadratic bezier
+		var r := lerpf(0.30, 0.15, f)
+		_root.add_child(_spar(prev, pt, r, COLOR_UPPER))
+		prev = pt
 	var mesh_s := SphereMesh.new()
-	mesh_s.radius = 0.32
-	mesh_s.height = 0.64
+	mesh_s.radius = 0.30
+	mesh_s.height = 0.60
 	var fig := MeshInstance3D.new()
 	fig.mesh = mesh_s
-	fig.position = Vector3(0, _depth * 1.25, -length * 0.535)
+	fig.position = p2
 	fig.material_override = _flat_material(COLOR_TRIM)
 	_root.add_child(fig)
 
@@ -285,18 +299,61 @@ func _build_bulwark_and_strakes() -> void:
 		_root.add_child(smi)
 
 
+## A superstructure lofted along the hull: walls follow the plan shape and
+## lean inboard (tumblehome), so bow and stern never read as boxes.
+func _castle_loft(t0: float, t1: float, y0: float, h: float, w_mult: float) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(0)
+	var steps := 8
+	var lean := 0.86
+	for i in steps:
+		var ta := lerpf(t0, t1, float(i) / steps)
+		var tb := lerpf(t0, t1, float(i + 1) / steps)
+		var za := -length / 2.0 + ta * length
+		var zb := -length / 2.0 + tb * length
+		var base_a := _deck_y(ta) + y0
+		var base_b := _deck_y(tb) + y0
+		var wa := _half_width(ta) * w_mult
+		var wb := _half_width(tb) * w_mult
+		for side in [-1.0, 1.0]:
+			_quad(st,
+				Vector3(side * wa, base_a, za), Vector3(side * wa * lean, base_a + h, za),
+				Vector3(side * wb * lean, base_b + h, zb), Vector3(side * wb, base_b, zb),
+				COLOR_UPPER, side > 0.0)
+		# Roof deck.
+		_quad(st,
+			Vector3(wa * lean, base_a + h, za), Vector3(-wa * lean, base_a + h, za),
+			Vector3(-wb * lean, base_b + h, zb), Vector3(wb * lean, base_b + h, zb),
+			COLOR_DECK, false)
+	# End walls.
+	for tt: float in [t0, t1]:
+		var z := -length / 2.0 + tt * length
+		var base := _deck_y(tt) + y0
+		var w := _half_width(tt) * w_mult
+		_quad(st,
+			Vector3(-w, base, z), Vector3(-w * lean, base + h, z),
+			Vector3(w * lean, base + h, z), Vector3(w, base, z),
+			COLOR_UPPER, false)
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _wood_mat
+	_root.add_child(mi)
+
+
 func _build_decks_and_stern() -> void:
-	# Quarterdeck (raised aft) and forecastle platforms sized by class.
+	# Stern castle and forecastle follow the hull's own curves.
 	var qd_h := _depth * (0.28 + 0.22 * _castle)
-	_box(Vector3(_beam * 0.88, qd_h, length * 0.24), Vector3(0, _deck_y(0.85) + qd_h * 0.5, length * 0.36), COLOR_UPPER, _wood_mat)
+	_castle_loft(0.70, 1.0, 0.0, qd_h, 0.97)
 	var pd_h := 0.0
 	if _castle >= 2:
-		# Poop deck: the towering second step of a galleon's stern castle.
+		# Poop deck: the second step of a galleon's stern castle.
 		pd_h = _depth * 0.32
-		_box(Vector3(_beam * 0.72, pd_h, length * 0.13), Vector3(0, _deck_y(0.92) + qd_h + pd_h * 0.5, length * 0.425), COLOR_UPPER, _wood_mat)
+		_castle_loft(0.84, 1.0, qd_h, pd_h, 0.90)
 	if _castle >= 1:
 		var fc_h := _depth * 0.35
-		_box(Vector3(_beam * 0.62, fc_h, length * 0.13), Vector3(0, _deck_y(0.1) + fc_h * 0.5, -length * 0.40), COLOR_UPPER, _wood_mat)
+		_castle_loft(0.02, 0.17, 0.0, fc_h, 0.92)
 
 	# Stern: window bands (one per gun deck), gold mouldings, galleries.
 	var top_y := _deck_y(1.0) + qd_h + pd_h
@@ -342,11 +399,12 @@ func _build_decks_and_stern() -> void:
 
 ## Height (0..1 between keel and deck) of every gunport row.
 func _gun_row_fracs() -> Array:
+	# All rows sit clear of the waterline (the keel reaches -0.85 depth).
 	match _gun_rows:
 		0: return []
-		1: return [0.74]
-		2: return [0.60, 0.78]
-		_: return [0.52, 0.67, 0.82]
+		1: return [0.76]
+		2: return [0.64, 0.80]
+		_: return [0.60, 0.72, 0.84]
 
 
 func _build_cannons() -> void:
@@ -368,6 +426,7 @@ func _build_cannons() -> void:
 				_box(Vector3(0.16, port_s, port_s), Vector3(side * x * 1.01, y, z), Color("0d0905"))
 				var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
 				barrel.rotation_degrees = Vector3(0, 0, 90)
+				_gun_ports[int(side)].append(Vector3(side * (x + 0.9), y, z))
 
 
 ## Carriage guns standing on the open deck, barrels out over the rail.
@@ -388,6 +447,7 @@ func _build_deck_guns() -> void:
 			# Barrel pointing out over the side.
 			var barrel := _cylinder(0.10, 0.14, 1.5, Vector3(x + side * 0.55, deck + 0.55, z), Color("15130f"))
 			barrel.rotation_degrees = Vector3(0, 0, side * 80.0)
+			_gun_ports[int(side)].append(Vector3(x + side * 1.4, deck + 0.6, z))
 
 
 ## Little sailors wandering the deck (animated in _process).
@@ -812,6 +872,62 @@ func set_speed_visual(speed: float) -> void:
 	var k := clampf(speed / 12.0, 0.0, 1.0)
 	_wake_mat.albedo_color = Color(1, 1, 1, k * 0.35)
 	_wake.scale = Vector3(1.0, 1.0, 0.5 + k * 0.9)
+
+
+# --- Broadside FX ---
+
+## A ragged volley: muzzle flash + drifting smoke at every gun of `side`.
+func fire_broadside_fx(side: int) -> void:
+	for p in _gun_ports.get(side, []):
+		_muzzle_smoke(p, float(side))
+
+
+func _muzzle_smoke(local_pos: Vector3, side: float) -> void:
+	var delay := randf() * 0.22
+	# Flash.
+	var flash := MeshInstance3D.new()
+	var fmesh := SphereMesh.new()
+	fmesh.radius = 0.45
+	fmesh.height = 0.9
+	flash.mesh = fmesh
+	var fmat := StandardMaterial3D.new()
+	fmat.albedo_color = Color(1.0, 0.75, 0.3)
+	fmat.emission_enabled = true
+	fmat.emission = Color(1.0, 0.6, 0.15)
+	fmat.emission_energy_multiplier = 4.0
+	fmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flash.material_override = fmat
+	flash.position = local_pos
+	flash.visible = false
+	_root.add_child(flash)
+	var ft := flash.create_tween()
+	ft.tween_interval(delay)
+	ft.tween_callback(func(): flash.visible = true)
+	ft.tween_property(flash, "transparency", 1.0, 0.15)
+	ft.tween_callback(flash.queue_free)
+	# Smoke cloud rolling out to the side.
+	var puff := MeshInstance3D.new()
+	var smesh := SphereMesh.new()
+	smesh.radius = 0.8
+	smesh.height = 1.6
+	puff.mesh = smesh
+	var smat := StandardMaterial3D.new()
+	smat.albedo_color = Color(0.93, 0.93, 0.9, 0.85)
+	smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smat.roughness = 1.0
+	puff.material_override = smat
+	puff.position = local_pos
+	puff.scale = Vector3(0.4, 0.4, 0.4)
+	puff.visible = false
+	_root.add_child(puff)
+	var tw := puff.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_callback(func(): puff.visible = true)
+	tw.tween_property(puff, "position",
+		local_pos + Vector3(side * randf_range(3.0, 4.5), randf_range(0.6, 1.4), randf_range(-0.6, 0.6)), 1.2)
+	tw.parallel().tween_property(puff, "scale", Vector3(3.4, 3.4, 3.4), 1.2)
+	tw.parallel().tween_property(puff, "transparency", 1.0, 1.2)
+	tw.tween_callback(puff.queue_free)
 
 
 # --- Animation hooks ---

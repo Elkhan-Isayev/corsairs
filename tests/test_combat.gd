@@ -41,7 +41,8 @@ func test_broadside_deals_damage() -> void:
 	assert_eq(report["fired"], 12, "full broadside (24/2)")
 	assert_gt(report["hits"], 0, "point-blank shots must land")
 	assert_lt(def.hull, hull_before, "hull damaged")
-	assert_eq(att.reload_progress, 0.0, "reload starts after the volley")
+	assert_eq(att.reload_right, 0.0, "the fired battery starts reloading")
+	assert_eq(att.reload_left, 1.0, "the other battery stays loaded")
 
 
 func test_broadside_consumes_ammo() -> void:
@@ -60,9 +61,11 @@ func test_no_fire_while_reloading() -> void:
 	var rng := seeded_rng()
 	var att := _armed("brig")
 	var def := _armed("brig")
-	Combat.fire_broadside(att, def, 100.0, {}, rng)
-	var second: Dictionary = Combat.fire_broadside(att, def, 100.0, {}, rng)
-	assert_eq(second["fired"], 0, "no volley while reloading")
+	Combat.fire_broadside(att, def, 100.0, {}, rng, 1)
+	var second: Dictionary = Combat.fire_broadside(att, def, 100.0, {}, rng, 1)
+	assert_eq(second["fired"], 0, "no volley while that side reloads")
+	var other: Dictionary = Combat.fire_broadside(att, def, 100.0, {}, rng, -1)
+	assert_gt(int(other["fired"]), 0, "the port battery fires independently")
 
 
 func test_no_fire_out_of_range() -> void:
@@ -82,7 +85,7 @@ func test_knippels_shred_sails_not_hull() -> void:
 	var def := _armed("frigate")
 	# Several volleys for statistical weight.
 	for i in 6:
-		att.reload_progress = 1.0
+		att.reload_right = 1.0
 		Combat.fire_broadside(att, def, 80.0, {"accuracy": 5}, rng)
 	var hull_lost: float = def.spec()["hull"] - def.hull
 	var sails_lost: float = def.spec()["sails"] - def.sails
@@ -96,19 +99,22 @@ func test_grapeshot_kills_crew() -> void:
 	var def := _armed("frigate")
 	var crew_before: int = def.crew
 	for i in 6:
-		att.reload_progress = 1.0
+		att.reload_right = 1.0
 		Combat.fire_broadside(att, def, 60.0, {"accuracy": 5}, rng)
 	assert_lt(def.crew, crew_before, "grapeshot mows down the crew")
 
 
 func test_reload_tick() -> void:
 	var s := _armed("brig")
-	s.reload_progress = 0.0
+	s.reload_left = 0.0
+	s.reload_right = 0.0
 	var t := Combat.reload_time(s, 0)
 	Combat.tick_reload(s, t / 2.0, 0)
-	assert_almost_eq(s.reload_progress, 0.5, 0.01)
+	assert_almost_eq(s.reload_left, 0.5, 0.01)
+	assert_eq(s.reload_left, s.reload_right, "both batteries reload at the same rate")
 	Combat.tick_reload(s, t, 0)
-	assert_eq(s.reload_progress, 1.0)
+	assert_eq(s.reload_left, 1.0)
+	assert_eq(s.reload_right, 1.0)
 
 
 func test_reload_faster_with_skill_and_crew() -> void:

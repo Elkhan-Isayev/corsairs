@@ -16,7 +16,9 @@ var ammo_stock := {"balls": 0, "knippels": 0, "grapeshot": 0, "bombs": 0}
 var cargo := {}  # goods_id -> units
 var sail_setting: float = 0.0  # 0.0 furled, 0.5 half, 1.0 full
 var heading: float = 0.0  # degrees, 0 = north
-var reload_progress: float = 1.0  # 1.0 = ready to fire
+# Per-side batteries: 1.0 = that broadside is ready to fire.
+var reload_left: float = 1.0
+var reload_right: float = 1.0
 
 
 static func create(p_type_id: String, name := "") -> RefCounted:
