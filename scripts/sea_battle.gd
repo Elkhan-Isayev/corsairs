@@ -184,7 +184,7 @@ func _build_ships() -> void:
 	player_len = _visual_length(player_ship)
 	if not free_sail:
 		enemy_len = _visual_length(enemy_ship)
-	player_node.build(player_len, _flag_color(Game.state.character.nation))
+	player_node.build(player_len, _flag_color(Game.state.character.nation), true, player_ship.type_id)
 	player_node.position = Vector3(0, 0, 0)
 	player_ship.heading = 0.0
 	player_ship.sail_setting = 0.5
@@ -195,7 +195,7 @@ func _build_ships() -> void:
 	enemy_node = Node3D.new()
 	enemy_node.set_script(ShipVisualScript)
 	add_child(enemy_node)
-	enemy_node.build(enemy_len, _flag_color(enemy_nation))
+	enemy_node.build(enemy_len, _flag_color(enemy_nation), true, enemy_ship.type_id)
 	enemy_node.position = Vector3(250, 0, -450)
 	enemy_heading = 180.0
 	enemy_ship.reload_progress = 1.0

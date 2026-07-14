@@ -309,7 +309,7 @@ func _build_quay_and_ship() -> void:
 	add_child(_ship_node)
 	var rank: int = Game.state.ship.spec()["rank"]
 	_ship_len = 18.0 + (8 - rank) * 5.0
-	_ship_node.build(_ship_len, Color(World.NATIONS[Game.state.character.nation]["color"]))
+	_ship_node.build(_ship_len, Color(World.NATIONS[Game.state.character.nation]["color"]), true, Game.state.ship.type_id)
 	_ship_node.position = ANCHOR_POS
 	_ship_node.rotation_degrees = Vector3(0, ANCHOR_ROT_Y, 0)
 	_ship_node.set_sail_amount(0.06)
@@ -692,18 +692,21 @@ func _sail_tick(delta: float) -> void:
 	camera.look_at(_ship_node.position + Vector3(0, 6, 0))
 
 	# Contextual hints: dock near the quay, or sail out to the open sea.
+	# Enter always leaves for the world map, from anywhere in the bay.
 	var near_dock: bool = _ship_node.position.distance_to(ANCHOR_POS) < 40.0
 	var far_out: bool = _ship_node.position.z < -260.0
 	if near_dock:
-		_hint.text = "[E]  Dock at the quay"
+		_hint.text = "[E]  Dock at the quay   |   [Enter]  Open sea — world map"
 		if Input.is_action_just_pressed("interact"):
 			_dock_ship()
 	elif far_out:
-		_hint.text = "[E]  Set sail for the open sea"
+		_hint.text = "[E / Enter]  Set sail for the open sea"
 		if Input.is_action_just_pressed("interact"):
 			Game.goto_open_sea_from_port()
 	else:
-		_hint.text = "W/S — sails, A/D — rudder | %.1f kn" % speed
+		_hint.text = "W/S — sails, A/D — rudder | %.1f kn | [Enter]  Open sea — world map" % speed
+	if Input.is_key_pressed(KEY_ENTER) or Input.is_key_pressed(KEY_KP_ENTER):
+		Game.goto_open_sea_from_port()
 
 
 # --- Townsfolk ---

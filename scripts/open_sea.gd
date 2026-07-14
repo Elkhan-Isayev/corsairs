@@ -13,6 +13,8 @@ const SHIP_LEN := 11.0
 const NPC_LEN := 10.0
 const NPC_LIMIT := 5
 const BATTLE_RANGE := 24.0    # a hostile sail this close forces the battle
+## Miniature hulls ride high so wave chop never washes over the deck.
+const SHIP_Y := -0.15
 
 var camera: Camera3D
 var cam_yaw := 180.0
@@ -252,7 +254,7 @@ func _build_player_ship() -> void:
 	_ship_node = Node3D.new()
 	_ship_node.set_script(ShipVisualScript)
 	add_child(_ship_node)
-	_ship_node.build(SHIP_LEN, Color(World.NATIONS[Game.state.character.nation]["color"]), false)
+	_ship_node.build(SHIP_LEN, Color(World.NATIONS[Game.state.character.nation]["color"]), false, Game.state.ship.type_id)
 	_ship_node.set_sail_amount(maxf(Game.state.ship.sail_setting, 0.06))
 	camera = Camera3D.new()
 	camera.far = 4500.0
@@ -276,7 +278,7 @@ func _place_player() -> void:
 		_heading = OpenSea.departure_heading(isl)
 	else:
 		_ship_node.position = OpenSea.map_center()
-	_ship_node.position.y = -0.5
+	_ship_node.position.y = SHIP_Y
 	_ship_node.rotation.y = -deg_to_rad(_heading)
 	camera.position = _ship_node.position + Vector3(0, 40, 80)
 
@@ -370,7 +372,7 @@ func _sail(delta: float) -> void:
 	_ship_node.set_sail_amount(maxf(ship.sail_setting, 0.06))
 	_ship_node.set_speed_visual(speed)
 	_ship_node.bob(_time, 0.4)
-	_ship_node.position.y = -0.5
+	_ship_node.position.y = SHIP_Y
 
 	# Sailing eats calendar days: wages, provisions, wind drift.
 	_distance_acc += moved.length()
@@ -415,11 +417,11 @@ func _spawn_sail(dist: float) -> void:
 	var enc: Dictionary = Game.state.roll_sea_encounter(OpenSea.nearest_island(_ship_node.position))
 	var ang := rng.randf_range(0.0, TAU)
 	var pos := OpenSea.clamp_to_bounds(_ship_node.position + Vector3(cos(ang), 0, sin(ang)) * dist)
-	pos.y = -0.5
+	pos.y = SHIP_Y
 	var node := Node3D.new()
 	node.set_script(ShipVisualScript)
 	add_child(node)
-	node.build(NPC_LEN, Color(World.NATIONS[enc["nation"]]["color"]), false)
+	node.build(NPC_LEN, Color(World.NATIONS[enc["nation"]]["color"]), false, enc["ship_type"])
 	node.position = pos
 	node.set_sail_amount(1.0)
 	_npcs.append({
@@ -457,7 +459,7 @@ func _update_npcs(delta: float) -> void:
 			OpenSea.clamp_to_bounds(node.position + fwd * float(n["speed"]) * delta))
 		node.rotation.y = -h
 		node.bob(_time, node.position.x * 0.1)
-		node.position.y = -0.5
+		node.position.y = SHIP_Y
 		node.set_speed_visual(float(n["speed"]) / SPEED_SCALE)
 
 		if hostile and d < BATTLE_RANGE:

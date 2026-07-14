@@ -41,7 +41,7 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 - 📜 **Governor quests** — cargo delivery, pirate hunting, passengers; deadlines and reputation penalties.
 - 🛠️ **Port life** — market, shipyard with 11 ship classes (tartane → man-of-war) and trade-in, crew hiring, repairs.
 - 💾 **Save system** — JSON saves with autosave after every voyage.
-- ⛵ **Procedural square-riggers** — smooth rounded hulls with ochre gun strakes, three sail tiers, jibs, gaff spankers, shrouds with ratlines, cannons in the ports, glowing stern lanterns — all generated at runtime, no model files.
+- ⛵ **Procedural ships with class-true silhouettes** — every one of the 11 hull classes looks the part: lateen-rigged tartanes and luggers, two-masted brigs, and three-deck men-of-war with stacked rows of gunports, towering stern castles and up to four sail tiers per mast. Smooth rounded hulls, ochre strakes, jibs, gaff spankers, shrouds with ratlines, glowing stern lanterns — all generated at runtime, no model files.
 - 🎵 **Procedurally synthesized soundtrack** — a calm sailing theme, a tense battle track, and ocean ambience, rendered to WAV by `tools/generate_music.gd` (no sampled audio).
 - 🎥 **Free orbit camera** in battle — drag with the right mouse button, zoom with the wheel.
 - 🏘️ **Walkable 3D port towns** — stroll the quay past your anchored ship, barrels and palms; **every building is enterable**: furnished tavern, store, shipyard and governor's mansion with NPCs to talk to, plus commoners' homes. All procedural.

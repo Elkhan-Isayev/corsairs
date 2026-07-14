@@ -16,6 +16,7 @@ const COLOR_SAIL := Color("d6cdb2")
 
 var length := 30.0
 var flag_color := Color("c62828")
+var type_id := ""
 
 var _sails: Array = []   # pivots scaled to furl/unfurl
 var _crew: Array = []    # wandering deck sailors: {node, target, speed}
@@ -29,14 +30,45 @@ var _depth: float
 var _wood_mat: StandardMaterial3D
 var _sail_mat: StandardMaterial3D
 
+## Rig & hull profile per ship class: mast count, rows of gunports,
+## square-sail tiers per mast, stern castle stages, lateen rig for the
+## small Mediterranean hulls.
+const PROFILES := {
+	"tartane":    {"masts": 1, "rows": 0, "tiers": 0, "castle": 0, "lateen": true},
+	"lugger":     {"masts": 2, "rows": 1, "tiers": 0, "castle": 0, "lateen": true},
+	"sloop":      {"masts": 2, "rows": 1, "tiers": 2, "castle": 0, "lateen": false},
+	"schooner":   {"masts": 2, "rows": 1, "tiers": 2, "castle": 0, "lateen": false},
+	"barque":     {"masts": 3, "rows": 1, "tiers": 2, "castle": 1, "lateen": false},
+	"brig":       {"masts": 2, "rows": 1, "tiers": 3, "castle": 1, "lateen": false},
+	"galleon":    {"masts": 3, "rows": 2, "tiers": 3, "castle": 2, "lateen": false},
+	"corvette":   {"masts": 3, "rows": 1, "tiers": 3, "castle": 1, "lateen": false},
+	"frigate":    {"masts": 3, "rows": 2, "tiers": 3, "castle": 1, "lateen": false},
+	"battleship": {"masts": 3, "rows": 2, "tiers": 4, "castle": 2, "lateen": false},
+	"manowar":    {"masts": 3, "rows": 3, "tiers": 4, "castle": 2, "lateen": false},
+}
 
-func build(p_length: float, p_flag: Color, with_crew := true) -> void:
+var _masts_n := 2
+var _gun_rows := 1
+var _tiers_n := 3
+var _castle := 1
+var _lateen := false
+
+
+func build(p_length: float, p_flag: Color, with_crew := true, p_type := "") -> void:
 	length = p_length
 	flag_color = p_flag
+	type_id = p_type
+	var prof: Dictionary = _profile_for(p_type)
+	_masts_n = int(prof["masts"])
+	_gun_rows = int(prof["rows"])
+	_tiers_n = int(prof["tiers"])
+	_castle = int(prof["castle"])
+	_lateen = bool(prof["lateen"])
 	_root = Node3D.new()
 	add_child(_root)
-	_beam = length * 0.26
-	_depth = length * 0.115
+	# Heavier classes are beamier and deeper: a man-of-war is a wall of oak.
+	_beam = length * (0.26 + 0.014 * _gun_rows)
+	_depth = length * (0.115 + 0.020 * maxi(_gun_rows - 1, 0))
 	_make_shared_materials()
 
 	_build_hull()
@@ -49,6 +81,15 @@ func build(p_length: float, p_flag: Color, with_crew := true) -> void:
 	if with_crew:
 		_build_crew()
 	_build_wake()
+
+
+func _profile_for(p_type: String) -> Dictionary:
+	if PROFILES.has(p_type):
+		return PROFILES[p_type]
+	# Unknown/legacy callers: infer something sensible from the size.
+	if length < 26.0:
+		return PROFILES["sloop"]
+	return PROFILES["brig"] if length < 34.0 else PROFILES["frigate"]
 
 
 func _make_shared_materials() -> void:
@@ -101,8 +142,10 @@ func _deck_y(t: float) -> float:
 
 
 func _bottom_y(t: float) -> float:
+	# Deep keel: most of the hull below y=0 stays under the waterline,
+	# so ships never look like they hover over the sea.
 	var rise := smoothstep(0.12, 0.0, t) * 0.5 + smoothstep(0.86, 1.0, t) * 0.45
-	return -_depth * 0.5 + _depth * rise * 0.6
+	return -_depth * 0.85 + _depth * rise * 0.4
 
 
 ## Hull cross-section rows: [x multiplier, y fraction bottom→deck].
@@ -213,8 +256,11 @@ func _build_bulwark_and_strakes() -> void:
 	mi.material_override = _wood_mat
 	_root.add_child(mi)
 
-	# Two ochre strakes like the original's gun-deck bands.
-	for frac: float in [0.78, 0.60]:
+	# An ochre strake framing every gun deck (plus one at the rail).
+	var strake_fracs: Array = [0.86]
+	for row_frac: float in _gun_row_fracs():
+		strake_fracs.append(row_frac + 0.085)
+	for frac: float in strake_fracs:
 		var strip := SurfaceTool.new()
 		strip.begin(Mesh.PRIMITIVE_TRIANGLES)
 		for i in steps:
@@ -240,19 +286,27 @@ func _build_bulwark_and_strakes() -> void:
 
 
 func _build_decks_and_stern() -> void:
-	# Quarterdeck (raised aft) and forecastle platforms.
-	var qd_h := _depth * 0.55
+	# Quarterdeck (raised aft) and forecastle platforms sized by class.
+	var qd_h := _depth * (0.28 + 0.22 * _castle)
 	_box(Vector3(_beam * 0.88, qd_h, length * 0.24), Vector3(0, _deck_y(0.85) + qd_h * 0.5, length * 0.36), COLOR_UPPER, _wood_mat)
-	var fc_h := _depth * 0.35
-	_box(Vector3(_beam * 0.62, fc_h, length * 0.13), Vector3(0, _deck_y(0.1) + fc_h * 0.5, -length * 0.40), COLOR_UPPER, _wood_mat)
+	var pd_h := 0.0
+	if _castle >= 2:
+		# Poop deck: the towering second step of a galleon's stern castle.
+		pd_h = _depth * 0.32
+		_box(Vector3(_beam * 0.72, pd_h, length * 0.13), Vector3(0, _deck_y(0.92) + qd_h + pd_h * 0.5, length * 0.425), COLOR_UPPER, _wood_mat)
+	if _castle >= 1:
+		var fc_h := _depth * 0.35
+		_box(Vector3(_beam * 0.62, fc_h, length * 0.13), Vector3(0, _deck_y(0.1) + fc_h * 0.5, -length * 0.40), COLOR_UPPER, _wood_mat)
 
-	# Stern: window band, gold mouldings, side galleries, two lanterns.
-	var top_y := _deck_y(1.0) + qd_h
-	_box(Vector3(_beam * 0.60, _depth * 0.26, 0.16), Vector3(0, top_y - _depth * 0.30, length * 0.505), Color("14100a"))
-	for dy in [-0.44, -0.16]:
-		_box(Vector3(_beam * 0.66, _depth * 0.055, 0.2), Vector3(0, top_y + _depth * dy, length * 0.505), COLOR_TRIM)
+	# Stern: window bands (one per gun deck), gold mouldings, galleries.
+	var top_y := _deck_y(1.0) + qd_h + pd_h
+	var bands := clampi(_gun_rows, 1, 2) + (1 if _castle >= 2 else 0)
+	for b in bands:
+		var band_y := top_y - _depth * (0.30 + 0.34 * b)
+		_box(Vector3(_beam * (0.60 - 0.06 * b), _depth * 0.22, 0.16), Vector3(0, band_y, length * 0.505), Color("14100a"))
+		_box(Vector3(_beam * 0.66, _depth * 0.05, 0.2), Vector3(0, band_y + _depth * 0.15, length * 0.505), COLOR_TRIM)
 	for side in [-1.0, 1.0]:
-		_box(Vector3(_beam * 0.10, _depth * 0.5, length * 0.10), Vector3(side * _beam * 0.40, top_y - _depth * 0.35, length * 0.44), COLOR_UPPER, _wood_mat)
+		_box(Vector3(_beam * 0.10, _depth * (0.4 + 0.25 * _castle), length * 0.10), Vector3(side * _beam * 0.40, top_y - _depth * 0.35, length * 0.44), COLOR_UPPER, _wood_mat)
 		# Lantern: warm emissive sphere on a post.
 		var lm := StandardMaterial3D.new()
 		lm.albedo_color = Color(1.0, 0.85, 0.5)
@@ -268,20 +322,52 @@ func _build_decks_and_stern() -> void:
 		lantern.material_override = lm
 		_root.add_child(lantern)
 		_cylinder(0.05, 0.05, 0.7, Vector3(side * _beam * 0.34, top_y + 0.3, length * 0.50), COLOR_MAST)
+	if _castle >= 2:
+		# The great center lantern of a first-rate.
+		var lm2 := StandardMaterial3D.new()
+		lm2.albedo_color = Color(1.0, 0.85, 0.5)
+		lm2.emission_enabled = true
+		lm2.emission = Color(1.0, 0.72, 0.3)
+		lm2.emission_energy_multiplier = 2.0
+		var big := MeshInstance3D.new()
+		var bs := SphereMesh.new()
+		bs.radius = 0.38
+		bs.height = 0.76
+		big.mesh = bs
+		big.position = Vector3(0, top_y + 1.05, length * 0.505)
+		big.material_override = lm2
+		_root.add_child(big)
+		_cylinder(0.06, 0.06, 0.9, Vector3(0, top_y + 0.45, length * 0.505), COLOR_MAST)
+
+
+## Height (0..1 between keel and deck) of every gunport row.
+func _gun_row_fracs() -> Array:
+	match _gun_rows:
+		0: return []
+		1: return [0.74]
+		2: return [0.60, 0.78]
+		_: return [0.52, 0.67, 0.82]
 
 
 func _build_cannons() -> void:
-	var n := clampi(int(length / 6.5), 3, 8)
-	for side in [-1.0, 1.0]:
-		for i in n:
-			var t := 0.30 + float(i) / n * 0.44
-			var z := -length / 2.0 + t * length
-			var x := _half_width(t)
-			var y := _bottom_y(t) + (_deck_y(t) - _bottom_y(t)) * 0.69
-			# Gunport frame + barrel poking out.
-			_box(Vector3(0.10, length * 0.026, length * 0.026), Vector3(side * x * 1.005, y, z), Color("0d0905"))
-			var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
-			barrel.rotation_degrees = Vector3(0, 0, 90)
+	var n := clampi(int(length / 6.0), 3, 10)
+	var fracs: Array = _gun_row_fracs()
+	for row in fracs.size():
+		var frac: float = fracs[row]
+		# Lower decks carry more, heavier guns; stagger rows like the real thing.
+		var stagger: float = 0.5 * float(row % 2) / n
+		for side in [-1.0, 1.0]:
+			for i in n:
+				var t := 0.26 + (float(i) / n + stagger) * 0.50
+				var z := -length / 2.0 + t * length
+				var x := _half_width(t)
+				var y := _bottom_y(t) + (_deck_y(t) - _bottom_y(t)) * frac
+				# Port lid frame, dark port, barrel poking out.
+				var port_s := length * 0.030
+				_box(Vector3(0.12, port_s * 1.25, port_s * 1.25), Vector3(side * x * 1.0, y, z), Color("6d4a26"))
+				_box(Vector3(0.16, port_s, port_s), Vector3(side * x * 1.01, y, z), Color("0d0905"))
+				var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
+				barrel.rotation_degrees = Vector3(0, 0, 90)
 
 
 ## Carriage guns standing on the open deck, barrels out over the rail.
@@ -357,9 +443,24 @@ func _process(delta: float) -> void:
 
 func _mast_positions() -> Array:
 	# [t along hull, height multiplier, has_course_sail]
-	if length < 28.0:
-		return [[0.24, 0.92, true], [0.60, 1.0, true]]
-	return [[0.18, 0.94, true], [0.48, 1.05, true], [0.78, 0.78, false]]
+	match _masts_n:
+		1:
+			return [[0.42, 1.0, true]]
+		2:
+			return [[0.24, 0.92, true], [0.60, 1.0, true]]
+		_:
+			return [[0.18, 0.94, true], [0.48, 1.05, true], [0.78, 0.78, false]]
+
+
+## Square-sail tiers bottom-up: [y fraction, width multiplier, sail height fraction].
+func _sail_tiers() -> Array:
+	match _tiers_n:
+		2:
+			return [[0.40, 1.0, 0.26], [0.70, 0.76, 0.18]]
+		4:
+			return [[0.36, 1.0, 0.24], [0.60, 0.84, 0.18], [0.78, 0.66, 0.14], [0.92, 0.48, 0.10]]
+		_:
+			return [[0.40, 1.0, 0.26], [0.68, 0.82, 0.20], [0.88, 0.60, 0.14]]
 
 
 func _build_masts() -> void:
@@ -371,7 +472,7 @@ func _build_masts() -> void:
 		var h: float = length * 0.92 * masts[m][1]
 		var z := -length / 2.0 + t * length
 		var deck := _deck_y(t)
-		if m == 1 or (masts.size() == 2 and m == 1):
+		if m == mini(1, masts.size() - 1):
 			main_h = h
 			main_z = z
 		# Tapered mast in two segments with a slight aft rake.
@@ -393,15 +494,21 @@ func _build_masts() -> void:
 		top.material_override = _flat_material(COLOR_MAST)
 		mast_root.add_child(top)
 
-		# Sail tiers.
+		# Sails: lateen rig for the small Mediterranean hulls, square tiers
+		# for everything else.
 		var wb := _beam * 2.0 * (1.0 - m * 0.08)
-		if masts[m][2]:
-			_yard_with_sail(mast_root, h * 0.40, wb, h * 0.26)          # course
-		_yard_with_sail(mast_root, h * 0.68, wb * 0.82, h * 0.20)       # topsail
-		_yard_with_sail(mast_root, h * 0.88, wb * 0.60, h * 0.14)       # topgallant
-		# Spanker on the aft-most mast of 3-masted ships.
-		if masts.size() == 3 and m == 2:
-			_spanker(mast_root, h)
+		if _lateen:
+			_lateen_sail(mast_root, h)
+		else:
+			var tiers: Array = _sail_tiers()
+			for ti in tiers.size():
+				if ti == 0 and not masts[m][2]:
+					continue  # aft mast of a three-master carries no course
+				var tier: Array = tiers[ti]
+				_yard_with_sail(mast_root, h * tier[0], wb * tier[1], h * tier[2])
+			# Spanker on the aft-most mast of 3-masted ships.
+			if masts.size() == 3 and m == 2:
+				_spanker(mast_root, h)
 
 		# Shrouds with ratlines.
 		_shrouds(z, deck, h * 0.60)
@@ -470,6 +577,42 @@ func _square_sail_mesh(w_bottom: float, w_top: float, h: float, billow: float) -
 			st.add_vertex(pts[0]); st.add_vertex(pts[2]); st.add_vertex(pts[3])
 	st.generate_normals()
 	return st.commit()
+
+
+## Lateen rig: one long slanted yard with a triangular sail — the look of
+## tartanes and luggers.
+func _lateen_sail(mast_root: Node3D, h: float) -> void:
+	var fore := Vector3(0, h * 0.32, -length * 0.26)
+	var peak := Vector3(0, h * 1.00, length * 0.16)
+	mast_root.add_child(_spar(fore, peak, 0.09))
+	var clew := Vector3(0, h * 0.14, length * 0.30)
+	var pivot := Node3D.new()
+	pivot.position = fore
+	mast_root.add_child(pivot)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(0)
+	var yard_v: Vector3 = peak - fore
+	var clew_v: Vector3 = clew - fore
+	var grid := 6
+	for r in grid:
+		for c in grid:
+			var pts := []
+			for offset in [[0, 0], [1, 0], [1, 1], [0, 1]]:
+				var u := float(c + offset[0]) / grid
+				var v := float(r + offset[1]) / grid
+				var on_yard: Vector3 = yard_v * u
+				var p: Vector3 = on_yard.lerp(clew_v * u, v)
+				p.x += sin(PI * u) * sin(PI * v) * length * 0.03
+				pts.append(p)
+			st.add_vertex(pts[0]); st.add_vertex(pts[1]); st.add_vertex(pts[2])
+			st.add_vertex(pts[0]); st.add_vertex(pts[2]); st.add_vertex(pts[3])
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _sail_mat
+	pivot.add_child(mi)
+	_sails.append(pivot)
 
 
 ## Gaff spanker: the fore-and-aft sail on the aft mast.
