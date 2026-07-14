@@ -39,7 +39,7 @@ func _ready() -> void:
 	header_row.add_child(_header)
 
 	var exit_btn := Button.new()
-	exit_btn.text = "🏘 Back to town (Esc)"
+	exit_btn.text = "Back to town (Esc)"
 	exit_btn.pressed.connect(func(): Game.goto_port())
 	header_row.add_child(exit_btn)
 
@@ -125,12 +125,12 @@ func _build_port_tab() -> Control:
 	box.add_child(row)
 
 	var town := Button.new()
-	town.text = "🏘 Back to town"
+	town.text = "Back to town"
 	town.pressed.connect(func(): Game.goto_port())
 	row.add_child(town)
 
 	var sail := Button.new()
-	sail.text = "⚓ Set sail from %s — the open sea" % isl["name"]
+	sail.text = "Set sail from %s — the open sea" % isl["name"]
 	sail.pressed.connect(func(): Game.goto_open_sea_from_port())
 	row.add_child(sail)
 
@@ -211,7 +211,8 @@ func _build_market_tab() -> Control:
 		var is_export: bool = g in m.exports
 		var is_import: bool = g in m.imports
 		var name_color := "81c784" if is_export else ("e57373" if is_import else "cfe3f5")
-		grid.add_child(_label(info["name"] + ("  ↓" if is_export else ("  ↑" if is_import else "")), name_color))
+		# Words, not arrow glyphs — the web build's font has no arrows.
+		grid.add_child(_label(info["name"] + ("  (export)" if is_export else ("  (import)" if is_import else "")), name_color))
 		grid.add_child(_label(str(m.stock.get(g, 0))))
 		grid.add_child(_label("%d g" % m.buy_price(g, trade)))
 		grid.add_child(_label("%d g" % m.sell_price(g, trade)))
@@ -306,8 +307,21 @@ func _build_captain_tab() -> Control:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		box.add_child(row)
-		var bar := "█".repeat(c.skill(skill_id)) + "░".repeat(Character.MAX_SKILL - c.skill(skill_id))
-		row.add_child(_label("%-12s %s %d" % [Character.SKILL_NAMES[skill_id], bar, c.skill(skill_id)]))
+		var name_lbl := _label(Character.SKILL_NAMES[skill_id])
+		name_lbl.custom_minimum_size = Vector2(130, 0)
+		row.add_child(name_lbl)
+		# Segmented bar drawn with rects: the web build's font has no
+		# block-element glyphs, so no text-art bars.
+		var pips := HBoxContainer.new()
+		pips.add_theme_constant_override("separation", 3)
+		pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(pips)
+		for p in Character.MAX_SKILL:
+			var pip := ColorRect.new()
+			pip.custom_minimum_size = Vector2(16, 12)
+			pip.color = Color("e8c872") if p < c.skill(skill_id) else Color("3a4657")
+			pips.add_child(pip)
+		row.add_child(_label(str(c.skill(skill_id))))
 		if c.free_skill_points > 0 and c.skill(skill_id) < Character.MAX_SKILL:
 			var plus := Button.new()
 			plus.text = "+"

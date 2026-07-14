@@ -132,16 +132,15 @@ func _roll_encounter(dest_island: String) -> Dictionary:
 	var hostile: bool = enc_nation == "pirates" \
 		or world.are_at_war(enc_nation, character.nation) \
 		or world.reputation(enc_nation) < -30
-	# Hostiles may sail in squadrons of up to four.
+	# Any sail may travel in company — squadrons of up to four hulls.
 	var count := 1
-	if hostile:
-		var roll := rng.randf()
-		if roll > 0.92:
-			count = 4
-		elif roll > 0.78:
-			count = 3
-		elif roll > 0.55:
-			count = 2
+	var roll := rng.randf()
+	if roll > 0.92:
+		count = 4
+	elif roll > 0.78:
+		count = 3
+	elif roll > 0.55:
+		count = 2
 	return {"nation": enc_nation, "ship_type": type_id, "hostile": hostile, "count": count}
 
 

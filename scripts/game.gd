@@ -13,6 +13,9 @@ var boarding_ctx: Dictionary = {}
 ## Where to put the ship on the open sea: {"pos", "heading"} to resume
 ## after a battle, or {"from_island"} when leaving a port.
 var open_sea_ctx: Dictionary = {}
+## A friendly/neutral encounter sailing alongside in free-sail mode:
+## the same {"nation", "ship_type", "count"} dict, or {} for empty seas.
+var free_sail_company: Dictionary = {}
 
 ## Visual clock for the day/night cycle: 0..24, a full day in 8 real minutes.
 var time_of_day := 10.0
@@ -84,9 +87,11 @@ func goto_sea_battle(encounter: Dictionary) -> void:
 	_change_scene("res://scenes/sea.tscn", "Battle stations!")
 
 
-## Deck-scale sailing with no enemy — Enter on the world map.
-func goto_free_sail() -> void:
+## Deck-scale sailing with no enemy — Enter on the world map. A peaceful
+## sail nearby comes along as company to look at.
+func goto_free_sail(company: Dictionary = {}) -> void:
 	pending_encounter = {}
+	free_sail_company = company
 	_change_scene("res://scenes/sea.tscn", "Open waters")
 
 
@@ -131,12 +136,19 @@ func _build_loading_overlay() -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_child(box)
 
-	var anchor := Label.new()
-	anchor.text = "⚓"
-	anchor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	anchor.add_theme_font_size_override("font_size", 64)
-	anchor.add_theme_color_override("font_color", Color("f3d98a"))
-	box.add_child(anchor)
+	# A drawn ship's wheel: the web build's font has no emoji glyphs.
+	var wheel := Control.new()
+	wheel.custom_minimum_size = Vector2(96, 96)
+	wheel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	wheel.draw.connect(func():
+		var c := wheel.custom_minimum_size / 2.0
+		var gold := Color("f3d98a")
+		wheel.draw_arc(c, 30.0, 0.0, TAU, 48, gold, 4.0, true)
+		wheel.draw_circle(c, 8.0, gold)
+		for i in 8:
+			var dir := Vector2.RIGHT.rotated(TAU * i / 8.0)
+			wheel.draw_line(c + dir * 8.0, c + dir * 44.0, gold, 3.0))
+	box.add_child(wheel)
 
 	_loading_lbl = Label.new()
 	_loading_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

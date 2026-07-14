@@ -33,6 +33,9 @@ var enemy_skills := {"accuracy": 3, "cannons": 3, "boarding": 3, "fencing": 3}
 
 ## True when there is no enemy — sailing the deck-scale sea for its own sake.
 var free_sail := false
+## Peaceful sails cruising alongside in free-sail mode (visual only):
+## {node, heading, speed}. They neither fire nor get fired at.
+var company: Array = []
 
 var player_node: Node3D
 var player_len := 25.0
@@ -77,6 +80,13 @@ func _ready() -> void:
 	_start_ocean_ambience()
 	if free_sail:
 		_log("Open waters. Wind %d°.  [Enter] — back to the world map." % int(Game.state.wind["from"]))
+		if company.size() == 1:
+			var comp: Dictionary = Game.free_sail_company
+			_log("A %s %s cruises nearby." % [
+				World.NATIONS[comp["nation"]]["name"], comp["ship_type"]])
+		elif company.size() > 1:
+			_log("A %s squadron passes by — %d sail." % [
+				World.NATIONS[Game.free_sail_company["nation"]]["name"], company.size()])
 	elif enemies.size() > 1:
 		_log("Enemy squadron: %d sail of %s (%s). Wind %d°." % [
 			enemies.size(), enemy_ship.spec()["name"],
@@ -206,6 +216,7 @@ func _build_ships() -> void:
 	player_ship.reload_left = 1.0
 	player_ship.reload_right = 1.0
 	if free_sail:
+		_build_company()
 		return
 
 	# The squadron deploys in a loose line of battle.
@@ -222,6 +233,26 @@ func _build_ships() -> void:
 		e["ship"].reload_left = 1.0
 		e["ship"].reload_right = 1.0
 	enemy_node = enemies[0]["node"]
+
+
+## Peaceful company met on the world map: 1..4 sail abeam, just cruising.
+func _build_company() -> void:
+	var comp: Dictionary = Game.free_sail_company
+	if comp.is_empty():
+		return
+	var count: int = clampi(int(comp.get("count", 1)), 1, 4)
+	var rng: RandomNumberGenerator = Game.state.rng
+	for i in count:
+		var ship = Game.state.spawn_encounter_ship(comp)
+		var node := Node3D.new()
+		node.set_script(ShipVisualScript)
+		add_child(node)
+		node.build(_visual_length(ship), _flag_color(comp["nation"]), true, ship.type_id)
+		# A loose column off the starboard beam, on our own course.
+		node.position = Vector3(170 + (i % 2) * 90, 0, -160 - i * 150)
+		node.set_sail_amount(1.0)
+		company.append({"node": node,
+			"heading": rng.randf_range(-8.0, 8.0), "speed": rng.randf_range(4.5, 7.5)})
 
 
 func _visual_length(ship: RefCounted) -> float:
@@ -313,6 +344,14 @@ func _physics_process(delta: float) -> void:
 	player_node.bob(_time, 0.0)
 	player_node.set_speed_visual(p_speed)
 	Combat.tick_reload(player_ship, delta, cann)
+
+	# --- Peaceful company on open waters: they just sail on. ---
+	for c: Dictionary in company:
+		c["heading"] = wrapf(float(c["heading"])
+			+ sin(_time * 0.18 + float(c["node"].position.x) * 0.01) * 2.0 * delta, 0.0, 360.0)
+		_move_ship(c["node"], float(c["heading"]), float(c["speed"]), delta)
+		c["node"].bob(_time, float(c["node"].position.x) * 0.1)
+		c["node"].set_speed_visual(float(c["speed"]))
 
 	# --- Player fire / enemy squadron (skipped on open waters) ---
 	var dist: float = INF

@@ -203,7 +203,7 @@ func _build_hud() -> void:
 	add_child(hud)
 
 	var title := Label.new()
-	title.text = "⚔ BOARDING — %s (%s)" % [enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"]]
+	title.text = "BOARDING — %s (%s)" % [enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"]]
 	title.position = Vector2(420, 12)
 	title.add_theme_font_size_override("font_size", 22)
 	title.add_theme_color_override("font_color", Color("e8c872"))

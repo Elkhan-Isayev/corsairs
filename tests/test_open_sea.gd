@@ -119,9 +119,7 @@ func test_sea_encounter_rolls_are_valid() -> void:
 		assert_true(World.NATIONS.has(enc["nation"]), "nation exists")
 		assert_true(enc.has("ship_type") and enc.has("hostile"))
 		assert_between(int(enc["count"]), 1, 4, "squadrons are 1..4 sail")
-		if not enc["hostile"]:
-			assert_eq(int(enc["count"]), 1, "neutrals sail alone")
-		elif int(enc["count"]) > 1:
+		if int(enc["count"]) > 1:
 			saw_squadron = true
 	assert_true(saw_squadron, "squadrons do appear")
 

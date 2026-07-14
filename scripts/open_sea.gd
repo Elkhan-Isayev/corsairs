@@ -532,7 +532,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dock(dock_id)
 			else:
 				Game.open_sea_ctx = {"pos": _ship_node.position, "heading": _heading}
-				Game.goto_free_sail()
+				Game.goto_free_sail(_nearby_peaceful_sail())
+
+
+## The nearest friendly/neutral sail close enough to keep us company
+## when we take the helm; {} when we sail alone.
+func _nearby_peaceful_sail() -> Dictionary:
+	var best: Dictionary = {}
+	var best_d := 150.0
+	for n in _npcs:
+		if n["enc"]["hostile"]:
+			continue
+		var d: float = _ship_node.position.distance_to(n["node"].position)
+		if d < best_d:
+			best_d = d
+			best = n["enc"]
+	return best
 
 
 ## Parchment overlay: the archipelago chart with the player's position.
