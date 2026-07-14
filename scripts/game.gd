@@ -14,12 +14,19 @@ var boarding_ctx: Dictionary = {}
 ## after a battle, or {"from_island"} when leaving a port.
 var open_sea_ctx: Dictionary = {}
 
+## Visual clock for the day/night cycle: 0..24, a full day in 8 real minutes.
+var time_of_day := 10.0
+
 var _loading: CanvasLayer
 var _loading_lbl: Label
 
 
 func _ready() -> void:
 	_build_loading_overlay()
+
+
+func _process(delta: float) -> void:
+	time_of_day = wrapf(time_of_day + delta * (24.0 / 480.0), 0.0, 24.0)
 
 
 func new_game(captain_name: String, nation: String) -> void:

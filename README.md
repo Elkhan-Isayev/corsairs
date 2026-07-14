@@ -32,7 +32,7 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 
 ## Features
 
-- 🌊 **3D naval combat** — sail physics with a real wind model (in irons / close-hauled / broad reach / running), broadside volleys, reload timing, enemy AI, boarding, sinking.
+- 🌊 **3D naval combat** — sail physics with a real wind model, independent port/starboard batteries, muzzle smoke from every gun, enemy AI, boarding, sinking — and **enemy squadrons of up to four sail**. Sink them all and the sea is yours: you keep sailing in open waters. Break away far enough and you escape to the world map.
 - 💣 **Four ammo types** with distinct damage profiles, just like the original: **cannonballs** (hull), **chain shot** (sails), **grapeshot** (crew), **bombs** (heavy, short-ranged).
 - 🗺️ **A sailable open sea** — the world map is a real 3D ocean, Sea Dogs style: steer your miniature ship between 7 islands held by four nations plus a pirate haven. Days pass as you sail (wages, provisions), other sails cruise the horizon — and the hostile ones will chase you straight into a 3D battle. Press `M` for the parchment sea chart, `E` to drop anchor at an island, `Enter` to take the helm and sail the full-scale sea.
 - 💰 **Living economy** — 16 trade goods; every colony has its own exports (cheap) and imports (expensive), prices react to stock levels and your Trade skill. Trade routes are profitable — and there's a unit test proving it.
@@ -44,7 +44,8 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 - ⛵ **Procedural ships with class-true silhouettes** — every one of the 11 hull classes looks the part: lateen-rigged tartanes and luggers, two-masted brigs, and three-deck men-of-war with stacked rows of gunports, towering stern castles and up to four sail tiers per mast. Smooth rounded hulls, ochre strakes, jibs, gaff spankers, shrouds with ratlines, glowing stern lanterns — all generated at runtime, no model files.
 - 🎵 **Procedurally synthesized soundtrack** — a calm sailing theme, a tense battle track, and ocean ambience, rendered to WAV by `tools/generate_music.gd` (no sampled audio).
 - 🎥 **Free orbit camera** in battle — drag with the right mouse button, zoom with the wheel.
-- 🏘️ **Walkable 3D port towns** — stroll the quay past your anchored ship, barrels and palms; **every building is enterable**: furnished tavern, store, shipyard and governor's mansion with NPCs to talk to, plus commoners' homes. All procedural.
+- 🏘️ **Walkable 3D port towns, each one unique** — every island has its own street plan (market plaza, Dutch canal rows, hillside terraces, a ramshackle pirate cove…), its own terrain palette, light and weather (sunny, hazy, overcast with rain) and its nation's own tune. **Every building is enterable**: furnished tavern, store, shipyard and governor's mansion with NPCs to talk to. All procedural.
+- 🌗 **Day & night cycle** — the sun wheels overhead in towns, at sea and in battle; dawn and dusk burn on the horizon, nights bring moonlight and lantern glow.
 - 🏃 **Living decks** — carriage guns and sailors wandering the deck of every ship.
 - 🕹️ **Arcade sailing** — the wind flavors your speed (±25% at most) but never stalls the ship; battles stay fast.
 - ⚔️ **Third-person boarding** — cross to the enemy deck and fight with your cutlass while both crews clash around you; win to take the prize.

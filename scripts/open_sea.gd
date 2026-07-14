@@ -7,6 +7,14 @@ const Sailing := preload("res://core/sailing.gd")
 const World := preload("res://core/world.gd")
 const OpenSea := preload("res://core/open_sea.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
+const DayCycle := preload("res://scripts/day_cycle.gd")
+
+## Weather baseline for the world-map ocean (day/night modulates it).
+const OPEN_LOOK := {"sky_top": "2c5d96", "horizon": "cfe0e8", "fog": 0.00035,
+	"fog_color": "c9d8dc", "sun_energy": 1.4, "sun_color": "fff2d8"}
+
+var _sun: DirectionalLight3D
+var _env_res: Environment
 
 const SPEED_SCALE := 3.0      # knots -> world units per second on the chart
 const SHIP_LEN := 11.0
@@ -54,13 +62,10 @@ func _ready() -> void:
 # --- World building ---
 
 func _build_environment() -> void:
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-38, 47, 0)
-	sun.light_energy = 1.4
-	sun.light_color = Color(1.0, 0.93, 0.8)
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 500.0
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.shadow_enabled = true
+	_sun.directional_shadow_max_distance = 500.0
+	add_child(_sun)
 
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -86,6 +91,8 @@ func _build_environment() -> void:
 	e.fog_sky_affect = 0.15
 	add_child(env)
 	env.environment = e
+	_env_res = e
+	DayCycle.apply(_sun, _env_res, Game.time_of_day, OPEN_LOOK)
 
 
 func _build_ocean() -> void:
@@ -340,6 +347,7 @@ func _physics_process(delta: float) -> void:
 	if Game.state == null:
 		return
 	_time += delta
+	DayCycle.apply(_sun, _env_res, Game.time_of_day, OPEN_LOOK)
 	_sail(delta)
 	_update_npcs(delta)
 	_update_camera(delta)

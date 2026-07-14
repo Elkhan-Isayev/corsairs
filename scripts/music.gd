@@ -41,6 +41,15 @@ func play_shanty() -> void:
 	_play("res://assets/music/shanty.wav", -9.0)
 
 
+## Every nation's towns have their own tune.
+func play_town(nation: String) -> void:
+	var path := "res://assets/music/town_%s.wav" % nation
+	if not ResourceLoader.exists(path):
+		play_theme()
+		return
+	_play(path, -9.0)
+
+
 func _play(path: String, target_db: float) -> void:
 	if _current_track == path and _active.playing:
 		return

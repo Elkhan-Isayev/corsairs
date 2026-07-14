@@ -8,6 +8,7 @@ const World := preload("res://core/world.gd")
 const Sailing := preload("res://core/sailing.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
 const Person := preload("res://scripts/person.gd")
+const DayCycle := preload("res://scripts/day_cycle.gd")
 
 const WALK_SPEED := 9.0
 const SAIL_SPEED_SCALE := 2.6
@@ -51,10 +52,49 @@ const TIMBER := Color("3a2d1c")
 const WALL_COLORS := [Color("efe6d2"), Color("e6d3a8"), Color("d9b8a0"), Color("c9dcd4"), Color("e0c6c0")]
 const ROOF_COLORS := [Color("9a4a2e"), Color("7d3b26"), Color("5d4024")]
 
+## Every island has its own face: light, weather, ground palette and the
+## shape of its town. Layouts: rows, plaza, terraces, hillside, boulevard,
+## canal, scatter.
+const ISLAND_LOOKS := {
+	"oxbay": {"sun_color": "fff2d8", "sun_energy": 1.45, "sky_top": "2f6698",
+		"horizon": "e8d8b8", "fog": 0.0012, "fog_color": "dcc9a6", "overcast": 0.0,
+		"rain": false, "grass": "55713a", "sand": "c2a878", "hill": "42592f",
+		"layout": "rows"},
+	"redmond": {"sun_color": "ffe9c0", "sun_energy": 1.5, "sky_top": "2a5e94",
+		"horizon": "f2e2c0", "fog": 0.0009, "fog_color": "e8d8b0", "overcast": 0.0,
+		"rain": false, "grass": "5d7440", "sand": "cbb184", "hill": "4a6034",
+		"layout": "plaza"},
+	"isla_muelle": {"sun_color": "ffe2a8", "sun_energy": 1.6, "sky_top": "3a6a9a",
+		"horizon": "f4dfae", "fog": 0.0006, "fog_color": "e8d3a0", "overcast": 0.0,
+		"rain": false, "grass": "8a8148", "sand": "dcc48e", "hill": "7a6f3e",
+		"layout": "terraces"},
+	"conceicao": {"sun_color": "f4e6c8", "sun_energy": 1.25, "sky_top": "355e7a",
+		"horizon": "cfd8c8", "fog": 0.0022, "fog_color": "c2cec0", "overcast": 0.35,
+		"rain": true, "grass": "3d5c33", "sand": "b6a077", "hill": "2f4a28",
+		"layout": "hillside"},
+	"falaise_de_fleur": {"sun_color": "ffe6d4", "sun_energy": 1.4, "sky_top": "4a6ea0",
+		"horizon": "f4d8cc", "fog": 0.0010, "fog_color": "ecd4c4", "overcast": 0.0,
+		"rain": false, "grass": "5a7a44", "sand": "d2b990", "hill": "4d6a3a",
+		"layout": "boulevard"},
+	"douwesen": {"sun_color": "e8e4d8", "sun_energy": 1.1, "sky_top": "51616e",
+		"horizon": "aeb6ae", "fog": 0.0020, "fog_color": "b8bcb4", "overcast": 0.7,
+		"rain": true, "grass": "4c6240", "sand": "b0a480", "hill": "435538",
+		"layout": "canal"},
+	"quebradas": {"sun_color": "ffd9a0", "sun_energy": 1.3, "sky_top": "3c5a78",
+		"horizon": "e8c090", "fog": 0.0016, "fog_color": "d8b890", "overcast": 0.15,
+		"rain": false, "grass": "6a6438", "sand": "c9ad74", "hill": "5a5530",
+		"layout": "scatter"},
+}
+
+var _look: Dictionary = {}
+var _sun: DirectionalLight3D
+var _env_res: Environment
+
 
 func _ready() -> void:
-	Music.play_theme()
+	Music.play_town(_island()["nation"])
 	_rng.seed = hash(Game.state.current_island)
+	_look = ISLAND_LOOKS.get(Game.state.current_island, ISLAND_LOOKS["oxbay"])
 	_build_environment()
 	_build_terrain()
 	_build_quay_and_ship()
@@ -72,13 +112,10 @@ func _island() -> Dictionary:
 # --- Environment & terrain ---
 
 func _build_environment() -> void:
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-34, 48, 0)
-	sun.light_energy = 1.45
-	sun.light_color = Color(1.0, 0.9, 0.72)
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 250.0
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.shadow_enabled = true
+	_sun.directional_shadow_max_distance = 250.0
+	add_child(_sun)
 
 	var fill := DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-55, -130, 0)
@@ -90,11 +127,11 @@ func _build_environment() -> void:
 	var e := Environment.new()
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("2f6698")
-	sky_mat.sky_horizon_color = Color("e8d8b8")
+	sky_mat.sky_top_color = Color(_look["sky_top"])
+	sky_mat.sky_horizon_color = Color(_look["horizon"])
 	sky_mat.sky_curve = 0.14
 	sky_mat.ground_bottom_color = Color("2a3c28")
-	sky_mat.ground_horizon_color = Color("e8d8b8")
+	sky_mat.ground_horizon_color = Color(_look["horizon"])
 	sky_mat.sun_angle_max = 25.0
 	sky.sky_material = sky_mat
 	e.background_mode = Environment.BG_SKY
@@ -106,15 +143,48 @@ func _build_environment() -> void:
 	e.adjustment_enabled = true
 	e.adjustment_saturation = 1.12
 	e.fog_enabled = true
-	e.fog_light_color = Color("dcc9a6")
-	e.fog_density = 0.0012
+	e.fog_light_color = Color(_look["fog_color"])
+	e.fog_density = float(_look["fog"])
 	env.environment = e
 	add_child(env)
+	_env_res = e
+	DayCycle.apply(_sun, _env_res, Game.time_of_day, _look)
+
+	if bool(_look["rain"]):
+		_build_rain()
 
 	camera = Camera3D.new()
 	camera.far = 3000.0
 	camera.fov = 65.0
 	add_child(camera)
+
+
+## Streaks of rain over the town (rainy islands only).
+func _build_rain() -> void:
+	var rain := GPUParticles3D.new()
+	rain.amount = 900
+	rain.lifetime = 1.1
+	rain.preprocess = 1.0
+	rain.visibility_aabb = AABB(Vector3(-130, -5, -90), Vector3(260, 70, 240))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(120, 1, 110)
+	pm.direction = Vector3(0.12, -1, 0)
+	pm.initial_velocity_min = 38.0
+	pm.initial_velocity_max = 46.0
+	pm.gravity = Vector3(0, -22, 0)
+	rain.process_material = pm
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.035, 0.7)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.75, 0.82, 0.9, 0.32)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	quad.material = m
+	rain.draw_pass_1 = quad
+	rain.position = Vector3(0, 42, 20)
+	add_child(rain)
 
 
 func _build_terrain() -> void:
@@ -125,7 +195,7 @@ func _build_terrain() -> void:
 	ground.mesh = gm
 	ground.position = Vector3(0, 0, 186)
 	var gmat := StandardMaterial3D.new()
-	gmat.albedo_color = Color("55713a")
+	gmat.albedo_color = Color(_look["grass"])
 	gmat.albedo_texture = _noise_tex(0.05, Color(0.85, 0.85, 0.78))
 	gmat.uv1_triplanar = true
 	gmat.uv1_scale = Vector3(0.5, 0.5, 0.5)
@@ -139,17 +209,14 @@ func _build_terrain() -> void:
 	sand.mesh = sm
 	sand.position = Vector3(0, 0.02, 5)
 	var smat := StandardMaterial3D.new()
-	smat.albedo_color = Color("c2a878")
+	smat.albedo_color = Color(_look["sand"])
 	smat.albedo_texture = _noise_tex(0.15, Color(0.88, 0.85, 0.8))
 	smat.uv1_triplanar = true
 	sand.material_override = smat
 	add_child(sand)
 
-	# Cobblestone main street and square.
-	for cobble in [
-		{"size": Vector2(14, 60), "pos": Vector3(0, 0.04, 32)},
-		{"size": Vector2(70, 12), "pos": Vector3(0, 0.04, 14)},
-	]:
+	# Streets: each layout paves its own plan.
+	for cobble in _street_rects():
 		var street := MeshInstance3D.new()
 		var stm := PlaneMesh.new()
 		stm.size = cobble["size"]
@@ -197,9 +264,29 @@ func _build_terrain() -> void:
 		var hill_z: float = _rng.randf_range(90.0 + hm.radius, 200.0 + hm.radius)
 		hill.position = Vector3(_rng.randf_range(-220, 220), -8, hill_z)
 		var hmat := StandardMaterial3D.new()
-		hmat.albedo_color = Color("42592f").lerp(Color("5d7040"), _rng.randf())
+		hmat.albedo_color = Color(_look["hill"]).lerp(Color(_look["hill"]).lightened(0.18), _rng.randf())
 		hill.material_override = hmat
 		add_child(hill)
+
+	# The Dutch town gets its canal down the middle.
+	if String(_look["layout"]) == "canal":
+		var canal := MeshInstance3D.new()
+		var cm := PlaneMesh.new()
+		cm.size = Vector2(120, 9)
+		canal.mesh = cm
+		canal.position = Vector3(0, 0.05, 30)
+		var cmat := StandardMaterial3D.new()
+		cmat.albedo_color = Color("2c4a52")
+		cmat.roughness = 0.15
+		cmat.metallic = 0.3
+		canal.material_override = cmat
+		add_child(canal)
+		for bx in [-20.0, 20.0]:
+			var bridge := _mesh_box(Vector3(4.0, 0.5, 11.0), Vector3(bx, 0.55, 30), Color("8d8577"))
+			bridge.rotation_degrees = Vector3(0, 0, 0)
+		_colliders.append(Rect2(-60, 26.5, 40, 7))
+		_colliders.append(Rect2(-16, 26.5, 32, 7))
+		_colliders.append(Rect2(24, 26.5, 36, 7))
 
 	# Palms.
 	for i in 14:
@@ -328,31 +415,143 @@ func _build_quay_and_ship() -> void:
 
 # --- Town ---
 
-func _build_town() -> void:
-	# Plain colonial houses along two streets.
-	for i in 9:
-		var x := -52.0 + i * 13.0 + _rng.randf_range(-2, 2)
-		if absf(x) < 9.0:
-			continue  # leave the main street open
-		_house(Vector3(x, 0, 26 + _rng.randf_range(-2, 2)), Vector3(7, 5, 6))
-	for i in 7:
-		var x := -45.0 + i * 15.0 + _rng.randf_range(-2, 2)
-		if absf(x) < 9.0:
-			continue
-		_house(Vector3(x, 0, 44 + _rng.randf_range(-2, 2)), Vector3(8, 5.5, 7))
+## Street plan per layout (paved rectangles).
+func _street_rects() -> Array:
+	match String(_look["layout"]):
+		"plaza":
+			return [
+				{"size": Vector2(36, 34), "pos": Vector3(0, 0.04, 30)},
+				{"size": Vector2(12, 26), "pos": Vector3(0, 0.04, 6)},
+			]
+		"terraces":
+			return [
+				{"size": Vector2(92, 8), "pos": Vector3(0, 0.04, 18)},
+				{"size": Vector2(80, 8), "pos": Vector3(6, 0.04, 33)},
+				{"size": Vector2(66, 8), "pos": Vector3(12, 0.04, 49)},
+				{"size": Vector2(10, 46), "pos": Vector3(-22, 0.04, 32)},
+			]
+		"hillside":
+			return [
+				{"size": Vector2(12, 58), "pos": Vector3(0, 0.04, 32)},
+				{"size": Vector2(78, 10), "pos": Vector3(0, 0.04, 22)},
+				{"size": Vector2(54, 8), "pos": Vector3(0, 0.04, 44)},
+			]
+		"boulevard":
+			return [
+				{"size": Vector2(122, 14), "pos": Vector3(0, 0.04, 30)},
+				{"size": Vector2(12, 54), "pos": Vector3(0, 0.04, 34)},
+			]
+		"canal":
+			return [
+				{"size": Vector2(112, 8), "pos": Vector3(0, 0.04, 21)},
+				{"size": Vector2(112, 8), "pos": Vector3(0, 0.04, 39)},
+				{"size": Vector2(8, 44), "pos": Vector3(-44, 0.04, 26)},
+				{"size": Vector2(8, 44), "pos": Vector3(44, 0.04, 26)},
+			]
+		"scatter":
+			return [
+				{"size": Vector2(64, 44), "pos": Vector3(0, 0.05, 28)},
+			]
+		_:
+			return [
+				{"size": Vector2(14, 60), "pos": Vector3(0, 0.04, 32)},
+				{"size": Vector2(70, 12), "pos": Vector3(0, 0.04, 14)},
+			]
 
-	# Special buildings with signs and interactions.
-	_special_building(Vector3(-26, 0, 12), Vector3(12, 7, 9), Color("b0765a"), "Tavern",
+
+## True when a footprint does not clip anything already built.
+func _area_free(pos: Vector3, size: Vector3) -> bool:
+	var rect := Rect2(pos.x - size.x / 2.0 - 1.0, pos.z - size.z / 2.0 - 1.0, size.x + 2.0, size.z + 2.0)
+	for c: Rect2 in _colliders:
+		if rect.intersects(c):
+			return false
+	return true
+
+
+func _build_town() -> void:
+	var layout := String(_look["layout"])
+
+	# Special buildings claim their spots first, per layout.
+	const SPECIAL_SPOTS := {
+		"rows": {"tavern": Vector3(-26, 0, 12), "store": Vector3(26, 0, 12), "yard": Vector3(52, 0, 2), "gov": Vector3(0, 0, 62)},
+		"plaza": {"tavern": Vector3(-26, 0, 30), "store": Vector3(26, 0, 30), "yard": Vector3(-50, 0, 4), "gov": Vector3(0, 0, 56)},
+		"terraces": {"tavern": Vector3(-40, 0, 11), "store": Vector3(32, 0, 11), "yard": Vector3(54, 0, 2), "gov": Vector3(22, 0, 64)},
+		"hillside": {"tavern": Vector3(-22, 0, 12), "store": Vector3(22, 0, 12), "yard": Vector3(48, 0, 2), "gov": Vector3(0, 0, 64)},
+		"boulevard": {"tavern": Vector3(-18, 0, 50), "store": Vector3(18, 0, 50), "yard": Vector3(-52, 0, 6), "gov": Vector3(0, 0, 72)},
+		"canal": {"tavern": Vector3(-56, 0, 30), "store": Vector3(56, 0, 30), "yard": Vector3(50, 0, 6), "gov": Vector3(0, 0, 60)},
+		"scatter": {"tavern": Vector3(-16, 0, 10), "store": Vector3(20, 0, 16), "yard": Vector3(46, 0, 4), "gov": Vector3(-10, 0, 64)},
+	}
+	var sp: Dictionary = SPECIAL_SPOTS.get(layout, SPECIAL_SPOTS["rows"])
+	_special_building(sp["tavern"], Vector3(12, 7, 9), Color("b0765a"), "Tavern",
 		"Tavern — hire crew, quests", "tavern", 0)
-	_special_building(Vector3(26, 0, 12), Vector3(12, 7, 9), Color("e6d3a8"), "Store",
+	_special_building(sp["store"], Vector3(12, 7, 9), Color("e6d3a8"), "Store",
 		"Store — trade goods", "store", 1)
-	_special_building(Vector3(52, 0, 2), Vector3(14, 6, 12), Color("c9b8a0"), "Shipyard",
+	_special_building(sp["yard"], Vector3(14, 6, 12), Color("c9b8a0"), "Shipyard",
 		"Shipyard — ships, ammo, repairs", "shipyard", 2)
-	var gpos := Vector3(0, 0, 62)
+	var gpos: Vector3 = sp["gov"]
 	_special_building(gpos, Vector3(18, 9, 12), Color("f2ede0"), "Governor",
 		"Governor — quests and audience", "governor", 0)
 	for cx in [-6.0, -2.0, 2.0, 6.0]:
 		_mesh_cyl(0.45, 0.45, 7.0, gpos + Vector3(cx, 3.5, -6.8), Color("f5f1e6"))
+
+	# Then the houses fill whatever the layout leaves free.
+	var spots: Array = []
+	match layout:
+		"plaza":
+			for x in [-28.0, -14.0, 14.0, 28.0]:
+				spots.append({"pos": Vector3(x, 0, 16), "size": Vector3(7, 5, 6)})
+				spots.append({"pos": Vector3(x, 0, 46), "size": Vector3(7, 5.5, 6)})
+			for z in [24.0, 38.0]:
+				spots.append({"pos": Vector3(-38, 0, z), "size": Vector3(6, 5, 6)})
+				spots.append({"pos": Vector3(38, 0, z), "size": Vector3(6, 5, 6)})
+		"terraces":
+			for i in 5:
+				spots.append({"pos": Vector3(-44 + i * 15.5, 0, 25 + _rng.randf_range(-1, 1)), "size": Vector3(7, 5, 6)})
+			for i in 4:
+				spots.append({"pos": Vector3(-28 + i * 16.5, 0, 41), "size": Vector3(7.5, 5.5, 6.5)})
+			for i in 3:
+				spots.append({"pos": Vector3(-12 + i * 17.0, 0, 57), "size": Vector3(8, 6, 7)})
+		"hillside":
+			for i in 9:
+				var ang := deg_to_rad(-62.0 + i * 15.5)
+				var r := 34.0 + (i % 2) * 12.0
+				var p := Vector3(sin(ang) * r * 1.35, 0, 32.0 + cos(ang) * r * 0.62)
+				if absf(p.x) < 10.0:
+					continue
+				spots.append({"pos": p, "size": Vector3(7, 5, 6)})
+		"boulevard":
+			for i in 10:
+				var x := -58.0 + i * 13.0
+				if absf(x) < 9.0:
+					continue
+				spots.append({"pos": Vector3(x, 0, 21), "size": Vector3(7, 5.5, 6)})
+				spots.append({"pos": Vector3(x + 3.0, 0, 39), "size": Vector3(7, 5, 6)})
+		"canal":
+			for i in 9:
+				var x := -48.0 + i * 12.0
+				spots.append({"pos": Vector3(x, 0, 13), "size": Vector3(5.5, 7, 5.5)})
+				spots.append({"pos": Vector3(x + 4.0, 0, 47), "size": Vector3(5.5, 6.5, 5.5)})
+		"scatter":
+			for i in 14:
+				spots.append({
+					"pos": Vector3(_rng.randf_range(-55, 55), 0, _rng.randf_range(14, 60)),
+					"size": Vector3(_rng.randf_range(5.5, 8.0), _rng.randf_range(4.0, 5.5), _rng.randf_range(5.0, 7.0)),
+				})
+		_:
+			for i in 9:
+				var x := -52.0 + i * 13.0 + _rng.randf_range(-2, 2)
+				if absf(x) < 9.0:
+					continue
+				spots.append({"pos": Vector3(x, 0, 26 + _rng.randf_range(-2, 2)), "size": Vector3(7, 5, 6)})
+			for i in 7:
+				var x2 := -45.0 + i * 15.0 + _rng.randf_range(-2, 2)
+				if absf(x2) < 9.0:
+					continue
+				spots.append({"pos": Vector3(x2, 0, 44 + _rng.randf_range(-2, 2)), "size": Vector3(8, 5.5, 7)})
+
+	for s in spots:
+		if _area_free(s["pos"], s["size"]):
+			_house(s["pos"], s["size"])
 
 
 ## A colonial house: timber-framed walls, windows with shutters, a door,
@@ -957,6 +1156,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	_time += delta
+	DayCycle.apply(_sun, _env_res, Game.time_of_day, _look)
 	if _sailing:
 		_sail_tick(delta)
 		_process_npcs(delta)

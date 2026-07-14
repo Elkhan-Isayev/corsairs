@@ -14,6 +14,9 @@ func _initialize() -> void:
 	print("battle.wav done")
 	_save(_render_shanty(), "res://assets/music/shanty.wav")
 	print("shanty.wav done")
+	for nation in TOWN_TUNES:
+		_save(_render_town(TOWN_TUNES[nation]), "res://assets/music/town_%s.wav" % nation)
+		print("town_%s.wav done" % nation)
 	_save(_render_waves(), "res://assets/music/waves.wav")
 	print("waves.wav done")
 	quit(0)
@@ -263,6 +266,99 @@ func _render_shanty() -> PackedFloat32Array:
 			if pass_i == 1:
 				# Second pass: a fife doubles the tune an octave up.
 				_lead(buf, t, float(note[2]) * beat, float(note[1]) * 2.0, 0.028)
+	return buf
+
+
+# Every nation's towns get their own character:
+# England — a bouncy hornpipe; France — a gentle waltz; Spain — a guitar
+# piece over the Andalusian cadence; Holland — a square folk dance;
+# Pirates — a rowdy minor jig with stomps.
+const TOWN_TUNES := {
+	"england": {"bpm": 112.0, "beats": 4, "seed": 3, "lead": false, "perc": "soft",
+		"prog": [
+			{"bass": A1 * 2.0, "arp": [A3, 277.18, E4, A4]},
+			{"bass": D3 / 2.0, "arp": [D3, FS3, A3, D4]},
+			{"bass": A1 * 2.0, "arp": [A3, 277.18, E4, A4]},
+			{"bass": E2, "arp": [E3, 207.65 * 2.0, B3, E4]}]},
+	"france": {"bpm": 88.0, "beats": 3, "seed": 5, "lead": true, "perc": "waltz",
+		"prog": [
+			{"bass": F2, "arp": [F3, A3, C4, F4]},
+			{"bass": 116.54, "arp": [116.54 * 2.0, D4, F4, 116.54 * 4.0]},
+			{"bass": C2 * 2.0, "arp": [C3 * 2.0, E4, G4, C5]},
+			{"bass": F2, "arp": [F3, A3, C4, F4]}]},
+	"spain": {"bpm": 102.0, "beats": 4, "seed": 8, "lead": false, "perc": "none",
+		"prog": [
+			{"bass": A2, "arp": [A3, C4, E4, A4]},
+			{"bass": G2, "arp": [G3, B3, D4, G4]},
+			{"bass": F2 * 2.0, "arp": [F3, A3, C4, F4]},
+			{"bass": E2 * 2.0, "arp": [E3, 207.65 * 2.0, B3, E4]}]},
+	"holland": {"bpm": 96.0, "beats": 4, "seed": 11, "lead": true, "perc": "soft",
+		"prog": [
+			{"bass": G2, "arp": [G3, B3, D4, G4]},
+			{"bass": C2 * 2.0, "arp": [C3 * 2.0, E4, G4, C5]},
+			{"bass": D3 / 2.0, "arp": [D3, FS3, A3, D4]},
+			{"bass": G2, "arp": [G3, B3, D4, G4]}]},
+	"pirates": {"bpm": 108.0, "beats": 4, "seed": 13, "lead": false, "perc": "stomp",
+		"prog": [
+			{"bass": E2, "arp": [E3, G3, B3, E4]},
+			{"bass": D3 / 2.0, "arp": [D3, FS3, A3, D4]},
+			{"bass": E2, "arp": [E3, G3, B3, E4]},
+			{"bass": 61.74, "arp": [B3 / 2.0, D3, FS3, B3]}]},
+}
+
+
+## Parametric town tune: oom-pah (or waltz) bass, strummed chords, and a
+## melody improvised from chord tones — deterministic per nation seed.
+func _render_town(cfg: Dictionary) -> PackedFloat32Array:
+	var bpm: float = cfg["bpm"]
+	var beats: int = cfg["beats"]
+	var beat := 60.0 / bpm
+	var bar := beat * float(beats)
+	var prog: Array = cfg["prog"]
+	var bars := prog.size() * 4
+	var buf := PackedFloat32Array()
+	buf.resize(int(bar * bars * RATE))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(cfg["seed"])
+	var perc: String = cfg["perc"]
+
+	for b in bars:
+		var ch: Dictionary = prog[b % prog.size()]
+		var t0 := b * bar
+		var arp: Array = ch["arp"]
+		if beats == 3:
+			# Waltz: bass on 1, chord on 2 and 3.
+			_tone(buf, t0, beat * 0.9, float(ch["bass"]), 0.10, 0.01, beat * 0.35, [1.0, 0.2])
+			for k in [1, 2]:
+				for ci in 3:
+					_pluck(buf, t0 + k * beat + ci * 0.015, float(arp[ci]), 0.04, 0.24)
+		else:
+			for k in beats:
+				var f: float = float(ch["bass"]) if k % 2 == 0 else float(ch["bass"]) * 1.5
+				_tone(buf, t0 + k * beat, beat * 0.8, f, 0.09, 0.01, beat * 0.3, [1.0, 0.2])
+				if k % 2 == 1:
+					for ci in 3:
+						_pluck(buf, t0 + k * beat + ci * 0.015, float(arp[ci]), 0.042, 0.24)
+		match perc:
+			"soft":
+				_noise_burst(buf, t0 + beat * (beats - 1), 0.05, 0.035, rng)
+			"waltz":
+				_noise_burst(buf, t0 + beat, 0.035, 0.03, rng)
+				_noise_burst(buf, t0 + beat * 2.0, 0.035, 0.03, rng)
+			"stomp":
+				_tone(buf, t0, 0.13, 58.0, 0.14, 0.004, 0.10, [1.0])
+				_tone(buf, t0 + beat * 2.0, 0.13, 58.0, 0.12, 0.004, 0.10, [1.0])
+				_noise_burst(buf, t0 + beat * 3.0, 0.07, 0.04, rng)
+		# Melody: chord tones only, so it can never clash.
+		var n_notes := rng.randi_range(2, beats)
+		for i in n_notes:
+			var start := t0 + float(i) * bar / float(n_notes)
+			var tone_f: float = float(arp[rng.randi_range(1, arp.size() - 1)])
+			if rng.randf() < 0.35:
+				tone_f *= 2.0
+			_pluck(buf, start, tone_f, 0.10, 0.5)
+			if bool(cfg["lead"]) and b >= bars / 2 and i == 0:
+				_lead(buf, start, bar / float(n_notes) * 0.9, tone_f, 0.03)
 	return buf
 
 

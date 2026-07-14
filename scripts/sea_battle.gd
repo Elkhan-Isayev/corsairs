@@ -10,25 +10,32 @@ const Boarding := preload("res://core/boarding.gd")
 const Ammo := preload("res://core/ammo.gd")
 const World := preload("res://core/world.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
+const DayCycle := preload("res://scripts/day_cycle.gd")
+
+## Weather baseline for the battle sea (day/night modulates it).
+const SEA_LOOK := {"sky_top": "27548c", "horizon": "e8cfa8", "fog": 0.0005,
+	"fog_color": "d9c6a4", "sun_energy": 1.5, "sun_color": "ffe6b8"}
+
+var _sun: DirectionalLight3D
+var _env_res: Environment
 
 const SPEED_SCALE := 2.6      # knots -> m/s (sped up for arcade pacing)
 const ESCAPE_DISTANCE := 1600.0
 
 var player_ship: RefCounted
+## The enemy squadron (1..4 sail): {ship, node, len, heading, sail, ammo, sunk_handled}
+var enemies: Array = []
+## Nearest afloat enemy — kept in sync every frame for HUD/targeting.
 var enemy_ship: RefCounted
+var enemy_node: Node3D
 var enemy_nation: String
 var enemy_skills := {"accuracy": 3, "cannons": 3, "boarding": 3, "fencing": 3}
-var enemy_heading := 0.0
-var enemy_sail := 1.0
-var enemy_current_ammo := "balls"
 
 ## True when there is no enemy — sailing the deck-scale sea for its own sake.
 var free_sail := false
 
 var player_node: Node3D
-var enemy_node: Node3D
 var player_len := 25.0
-var enemy_len := 25.0
 var camera: Camera3D
 var battle_over := false
 var _time := 0.0
@@ -57,14 +64,23 @@ func _ready() -> void:
 		Music.play_shanty()
 	else:
 		Music.play_battle()
-		enemy_ship = Game.state.spawn_encounter_ship(enc)
 		enemy_nation = enc["nation"]
+		var count: int = clampi(int(enc.get("count", 1)), 1, 4)
+		for i in count:
+			var ship = Game.state.spawn_encounter_ship(enc)
+			enemies.append({"ship": ship, "node": null, "len": 25.0,
+				"heading": 180.0, "sail": 1.0, "ammo": "balls", "sunk_handled": false})
+		enemy_ship = enemies[0]["ship"]
 	_build_environment()
 	_build_ships()
 	_build_hud()
 	_start_ocean_ambience()
 	if free_sail:
 		_log("Open waters. Wind %d°.  [Enter] — back to the world map." % int(Game.state.wind["from"]))
+	elif enemies.size() > 1:
+		_log("Enemy squadron: %d sail of %s (%s). Wind %d°." % [
+			enemies.size(), enemy_ship.spec()["name"],
+			World.NATIONS[enemy_nation]["name"], int(Game.state.wind["from"])])
 	else:
 		_log("Enemy: %s \"%s\" (%s). Wind %d°." % [
 			enemy_ship.spec()["name"], enemy_ship.custom_name,
@@ -72,14 +88,12 @@ func _ready() -> void:
 
 
 func _build_environment() -> void:
-	# Late-afternoon sun: warm, low, with a visible disc in the sky.
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-24, 55, 0)
-	sun.light_energy = 1.5
-	sun.light_color = Color(1.0, 0.87, 0.68)
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 400.0
-	add_child(sun)
+	# The sun follows the global day/night clock.
+	_sun = DirectionalLight3D.new()
+	_sun.shadow_enabled = true
+	_sun.directional_shadow_max_distance = 400.0
+	add_child(_sun)
+	var sun := _sun
 
 	var fill := DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-60, -120, 0)
@@ -115,6 +129,8 @@ func _build_environment() -> void:
 	e.fog_sky_affect = 0.2
 	env.environment = e
 	add_child(env)
+	_env_res = e
+	DayCycle.apply(_sun, _env_res, Game.time_of_day, SEA_LOOK)
 
 	var water := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
@@ -183,8 +199,6 @@ func _build_ships() -> void:
 	player_node.set_script(ShipVisualScript)
 	add_child(player_node)
 	player_len = _visual_length(player_ship)
-	if not free_sail:
-		enemy_len = _visual_length(enemy_ship)
 	player_node.build(player_len, _flag_color(Game.state.character.nation), true, player_ship.type_id)
 	player_node.position = Vector3(0, 0, 0)
 	player_ship.heading = 0.0
@@ -194,14 +208,20 @@ func _build_ships() -> void:
 	if free_sail:
 		return
 
-	enemy_node = Node3D.new()
-	enemy_node.set_script(ShipVisualScript)
-	add_child(enemy_node)
-	enemy_node.build(enemy_len, _flag_color(enemy_nation), true, enemy_ship.type_id)
-	enemy_node.position = Vector3(250, 0, -450)
-	enemy_heading = 180.0
-	enemy_ship.reload_left = 1.0
-	enemy_ship.reload_right = 1.0
+	# The squadron deploys in a loose line of battle.
+	for i in enemies.size():
+		var e: Dictionary = enemies[i]
+		var node := Node3D.new()
+		node.set_script(ShipVisualScript)
+		add_child(node)
+		var elen: float = _visual_length(e["ship"])
+		node.build(elen, _flag_color(enemy_nation), true, e["ship"].type_id)
+		node.position = Vector3(250 + i * 120 - (enemies.size() - 1) * 60, 0, -450 - (i % 2) * 90)
+		e["node"] = node
+		e["len"] = elen
+		e["ship"].reload_left = 1.0
+		e["ship"].reload_right = 1.0
+	enemy_node = enemies[0]["node"]
 
 
 func _visual_length(ship: RefCounted) -> float:
@@ -268,6 +288,7 @@ func _physics_process(delta: float) -> void:
 	if battle_over:
 		return
 	_time += delta
+	DayCycle.apply(_sun, _env_res, Game.time_of_day, SEA_LOOK)
 	var wind: Dictionary = Game.state.wind
 	var nav: int = Game.state.character.skill("navigation")
 	var cann: int = Game.state.character.skill("cannons")
@@ -293,29 +314,23 @@ func _physics_process(delta: float) -> void:
 	player_node.set_speed_visual(p_speed)
 	Combat.tick_reload(player_ship, delta, cann)
 
-	# --- Player fire / enemy (skipped on open waters) ---
+	# --- Player fire / enemy squadron (skipped on open waters) ---
 	var dist: float = INF
 	if not free_sail:
-		dist = player_node.position.distance_to(enemy_node.position)
+		_refresh_nearest_enemy()
+		dist = _nearest_dist()
 		if Input.is_action_just_pressed("fire_left"):
-			_try_player_fire(dist, -1)
+			_try_player_fire(-1)
 		if Input.is_action_just_pressed("fire_right"):
-			_try_player_fire(dist, 1)
+			_try_player_fire(1)
 		if Input.is_action_just_pressed("board_enemy"):
 			_try_boarding(dist)
 
-		_enemy_ai(delta, dist, wind)
-
-		# Hulls never overlap: push the ships apart.
-		var min_d := (player_len + enemy_len) * 0.45
-		var between := player_node.position - enemy_node.position
-		between.y = 0.0
-		if between.length() < min_d and not enemy_ship.is_sunk():
-			var n := between.normalized() if between.length() > 0.01 else Vector3(1, 0, 0)
-			var push := (min_d - between.length()) * 0.5
-			player_node.position += n * push
-			enemy_node.position -= n * push
-			dist = player_node.position.distance_to(enemy_node.position)
+		for e: Dictionary in enemies:
+			if not e["ship"].is_sunk():
+				_enemy_ai_one(e, delta, wind)
+		_separate_hulls()
+		dist = _nearest_dist()
 
 	# --- Camera: free orbit around the player's ship ---
 	var yr := deg_to_rad(cam_yaw)
@@ -343,18 +358,88 @@ func _in_arc(from_node: Node3D, heading: float, to_node: Node3D, side: int) -> b
 	return to_target.dot(right * side) > 0.35
 
 
-func _try_player_fire(dist: float, side: int) -> void:
+## Nearest afloat enemy and helpers over the squadron.
+
+func _refresh_nearest_enemy() -> void:
+	var best_d := INF
+	for e: Dictionary in enemies:
+		if e["ship"].is_sunk():
+			continue
+		var d: float = player_node.position.distance_to(e["node"].position)
+		if d < best_d:
+			best_d = d
+			enemy_ship = e["ship"]
+			enemy_node = e["node"]
+
+
+func _nearest_dist() -> float:
+	var best := INF
+	for e: Dictionary in enemies:
+		if not e["ship"].is_sunk():
+			best = minf(best, player_node.position.distance_to(e["node"].position))
+	return best
+
+
+func _alive_count() -> int:
+	var n := 0
+	for e: Dictionary in enemies:
+		if not e["ship"].is_sunk():
+			n += 1
+	return n
+
+
+## Hulls never overlap: player vs every enemy, and enemies among themselves.
+func _separate_hulls() -> void:
+	for e: Dictionary in enemies:
+		if e["ship"].is_sunk():
+			continue
+		var min_d: float = (player_len + float(e["len"])) * 0.45
+		var node: Node3D = e["node"]
+		var between: Vector3 = player_node.position - node.position
+		between.y = 0.0
+		if between.length() < min_d:
+			var n := between.normalized() if between.length() > 0.01 else Vector3(1, 0, 0)
+			var push := (min_d - between.length()) * 0.5
+			player_node.position += n * push
+			node.position -= n * push
+	for i in enemies.size():
+		for j in range(i + 1, enemies.size()):
+			var a: Dictionary = enemies[i]
+			var b: Dictionary = enemies[j]
+			if a["ship"].is_sunk() or b["ship"].is_sunk():
+				continue
+			var min_d2: float = (float(a["len"]) + float(b["len"])) * 0.45
+			var betw: Vector3 = a["node"].position - b["node"].position
+			betw.y = 0.0
+			if betw.length() < min_d2:
+				var n2 := betw.normalized() if betw.length() > 0.01 else Vector3(1, 0, 0)
+				var push2 := (min_d2 - betw.length()) * 0.5
+				a["node"].position += n2 * push2
+				b["node"].position -= n2 * push2
+
+
+func _try_player_fire(side: int) -> void:
 	if Combat.reload_progress(player_ship, side) < 1.0:
 		_log("The %s battery is still reloading!" % ("port" if side < 0 else "starboard"))
 		return
-	if not _in_arc(player_node, player_ship.heading, enemy_node, side):
-		_log("Target is outside the %s arc!" % ("port" if side < 0 else "starboard"))
+	# Aim at the nearest afloat enemy inside this side's arc.
+	var target: Dictionary = {}
+	var best_d := INF
+	for e: Dictionary in enemies:
+		if e["ship"].is_sunk():
+			continue
+		var d: float = player_node.position.distance_to(e["node"].position)
+		if d < best_d and _in_arc(player_node, player_ship.heading, e["node"], side):
+			best_d = d
+			target = e
+	if target.is_empty():
+		_log("No target in the %s arc!" % ("port" if side < 0 else "starboard"))
 		return
 	var skills := {"accuracy": Game.state.character.skill("accuracy"), "cannons": Game.state.character.skill("cannons")}
-	var r: Dictionary = Combat.fire_broadside(player_ship, enemy_ship, dist, skills, Game.state.rng, side)
+	var r: Dictionary = Combat.fire_broadside(player_ship, target["ship"], best_d, skills, Game.state.rng, side)
 	if int(r["fired"]) > 0:
 		player_node.fire_broadside_fx(side)
-	_report_broadside(r, "Our broadside", enemy_node)
+	_report_broadside(r, "Our broadside", target["node"])
 
 
 func _report_broadside(r: Dictionary, who: String, target_node: Node3D) -> void:
@@ -388,49 +473,52 @@ func _spawn_shot_visuals(target: Node3D, hits: int) -> void:
 		tw.tween_callback(puff.queue_free)
 
 
-func _enemy_ai(delta: float, dist: float, wind: Dictionary) -> void:
-	if enemy_ship.is_sunk():
-		return
-	var to_player := player_node.position - enemy_node.position
+func _enemy_ai_one(e: Dictionary, delta: float, wind: Dictionary) -> void:
+	var ship = e["ship"]
+	var node: Node3D = e["node"]
+	var heading: float = e["heading"]
+	var to_player: Vector3 = player_node.position - node.position
+	var dist := to_player.length()
 	var bearing := rad_to_deg(atan2(to_player.x, -to_player.z))
-	var range_limit := Combat.max_range(enemy_ship.caliber, enemy_current_ammo)
+	var range_limit := Combat.max_range(ship.caliber, String(e["ammo"]))
 	var desired: float
 	if dist > range_limit * 0.75:
 		desired = bearing            # chase
-		enemy_sail = 1.0
+		e["sail"] = 1.0
 	else:
 		# Turn broadside-on: perpendicular to the bearing, whichever is closer.
 		var opt_a := wrapf(bearing + 90.0, 0.0, 360.0)
 		var opt_b := wrapf(bearing - 90.0, 0.0, 360.0)
-		var da := absf(wrapf(opt_a - enemy_heading, -180.0, 180.0))
-		var db := absf(wrapf(opt_b - enemy_heading, -180.0, 180.0))
+		var da := absf(wrapf(opt_a - heading, -180.0, 180.0))
+		var db := absf(wrapf(opt_b - heading, -180.0, 180.0))
 		desired = opt_a if da < db else opt_b
-		enemy_sail = 0.55
+		e["sail"] = 0.55
 
-	enemy_ship.sail_setting = enemy_sail
-	var e_speed: float = Sailing.ship_speed(enemy_ship, wind["from"], wind["strength"], 3)
-	var e_turn: float = Sailing.turn_speed(enemy_ship, e_speed, 3)
-	var diff := wrapf(desired - enemy_heading, -180.0, 180.0)
-	enemy_heading = wrapf(enemy_heading + clampf(diff, -e_turn * delta, e_turn * delta), 0.0, 360.0)
-	_move_ship(enemy_node, enemy_heading, e_speed, delta)
-	enemy_node.set_sail_amount(enemy_ship.sail_setting)
-	enemy_node.bob(_time, 2.1)
-	enemy_node.set_speed_visual(e_speed)
-	Combat.tick_reload(enemy_ship, delta, 3)
+	ship.sail_setting = e["sail"]
+	var e_speed: float = Sailing.ship_speed(ship, wind["from"], wind["strength"], 3)
+	var e_turn: float = Sailing.turn_speed(ship, e_speed, 3)
+	var diff := wrapf(desired - heading, -180.0, 180.0)
+	heading = wrapf(heading + clampf(diff, -e_turn * delta, e_turn * delta), 0.0, 360.0)
+	e["heading"] = heading
+	_move_ship(node, heading, e_speed, delta)
+	node.set_sail_amount(ship.sail_setting)
+	node.bob(_time, 2.1 + node.position.x * 0.01)
+	node.set_speed_visual(e_speed)
+	Combat.tick_reload(ship, delta, 3)
 
 	# Ammo choice: far — cannonballs; close with a crew advantage — grapeshot.
-	if dist < range_limit * 0.4 and enemy_ship.crew > player_ship.crew:
-		enemy_current_ammo = "grapeshot"
+	if dist < range_limit * 0.4 and ship.crew > player_ship.crew:
+		e["ammo"] = "grapeshot"
 	else:
-		enemy_current_ammo = "balls"
-	enemy_ship.current_ammo = enemy_current_ammo
+		e["ammo"] = "balls"
+	ship.current_ammo = e["ammo"]
 
 	for side: int in [-1, 1]:
-		if Combat.reload_progress(enemy_ship, side) >= 1.0 \
-				and _in_arc(enemy_node, enemy_heading, player_node, side):
-			var r: Dictionary = Combat.fire_broadside(enemy_ship, player_ship, dist, enemy_skills, Game.state.rng, side)
+		if Combat.reload_progress(ship, side) >= 1.0 \
+				and _in_arc(node, heading, player_node, side):
+			var r: Dictionary = Combat.fire_broadside(ship, player_ship, dist, enemy_skills, Game.state.rng, side)
 			if r["fired"] > 0:
-				enemy_node.fire_broadside_fx(side)
+				node.fire_broadside_fx(side)
 				_report_broadside(r, "Enemy broadside", player_node)
 			break
 
@@ -458,30 +546,37 @@ func _update_hud(dist: float, p_speed: float) -> void:
 		lbl_enemy.text = ""
 		lbl_wind.text += "   [Enter — world map]"
 		return
-	lbl_enemy.text = "%s (%s)\nHull: %d%%  Sails: %d%%\nCrew: %d  Distance: %d m" % [
-		enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"],
+	var afloat := _alive_count()
+	var squadron := "" if enemies.size() == 1 else "Squadron: %d/%d afloat\n" % [afloat, enemies.size()]
+	lbl_enemy.text = "%s%s (%s)\nHull: %d%%  Sails: %d%%\nCrew: %d  Distance: %d m" % [
+		squadron, enemy_ship.custom_name, World.NATIONS[enemy_nation]["name"],
 		int(enemy_ship.hull_frac() * 100), int(enemy_ship.sails_frac() * 100),
 		enemy_ship.crew, int(dist)]
-	if dist < 120.0 and not enemy_ship.is_sunk():
+	if dist < 120.0 and afloat > 0:
 		lbl_wind.text += "   [B — BOARD!]"
 
 
 func _check_battle_end(dist: float) -> void:
 	if free_sail:
 		return
-	if enemy_ship.is_sunk():
-		var outcome: Dictionary = Game.state.on_enemy_sunk(enemy_ship, enemy_nation)
-		var msg := "The enemy is going down! XP +%d." % outcome["xp"]
-		if outcome["level_up"]:
-			msg += " Level up!"
-		for q in outcome["completed_quests"]:
-			msg += " Quest completed: %s." % q["title"]
-		_sink_visual(enemy_node)
-		_finish_battle(msg)
-	elif player_ship.is_sunk():
+	# Credit every ship the moment it goes down.
+	for e: Dictionary in enemies:
+		if e["ship"].is_sunk() and not bool(e["sunk_handled"]):
+			e["sunk_handled"] = true
+			var outcome: Dictionary = Game.state.on_enemy_sunk(e["ship"], enemy_nation)
+			var msg := "%s is going down! XP +%d." % [e["ship"].spec()["name"], outcome["xp"]]
+			if outcome["level_up"]:
+				msg += " Level up!"
+			for q in outcome["completed_quests"]:
+				msg += " Quest completed: %s." % q["title"]
+			_sink_visual(e["node"])
+			_log(msg)
+	if player_ship.is_sunk():
 		_defeat("Your ship has been sunk...")
 	elif player_ship.is_crew_critical():
 		_defeat("Not enough crew left to handle the ship.")
+	elif _alive_count() == 0:
+		_victory_to_open_waters()
 	elif dist > ESCAPE_DISTANCE:
 		_finish_battle("You broke away from the enemy.")
 
@@ -492,6 +587,15 @@ func _sink_visual(node: Node3D) -> void:
 	tw.parallel().tween_property(node, "rotation:z", 0.6, 4.0)
 
 
+## Victory: the sea is yours — sail on in open waters, no forced exit.
+func _victory_to_open_waters() -> void:
+	free_sail = true
+	Music.play_shanty()
+	Game.save_game()
+	_log("The sea is clear. Sail on — or press Enter for the world map.")
+
+
+## Breaking away still returns to the world map (you fled the fight).
 func _finish_battle(msg: String) -> void:
 	battle_over = true
 	_log(msg)
