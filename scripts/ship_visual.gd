@@ -41,7 +41,8 @@ var _gun_ports := {-1: [], 1: []}
 ## tanbark (red-brown) working sails on tartanes and luggers, coppered
 ## or white-stuff bottoms.
 ## livery: bottom (underwater), wale (main hull), upper (upperworks),
-## band (gun-deck stripe), lid (port lids), trim (rails/carvings), sail.
+## band (gun-deck stripe), lid (port lids), trim (rails/carvings), sail;
+## optional topside (hull side above the wale — defaults to upper).
 const PROFILES := {
 	"tartane": {"masts": 1, "rows": 0, "tiers": 0, "castle": 0, "lateen": true,
 		"livery": {"bottom": "d8d2c0", "wale": "6b4f30", "upper": "5a3f26",
@@ -73,9 +74,13 @@ const PROFILES := {
 	"battleship": {"masts": 3, "rows": 2, "tiers": 4, "castle": 2, "lateen": false,
 		"livery": {"bottom": "9a5b3c", "wale": "141210", "upper": "15130e",
 			"band": "c9a54f", "lid": "0a0806", "trim": "d4af37", "sail": "e0d8bd"}},
+	# The man-of-war follows the Sea Dogs look: light oak planking with rows
+	# of open ports, verdigris-teal bulwarks and castles, gilt carvings.
+	# "topside" keeps the hull side oak; teal stays above the deck line.
 	"manowar": {"masts": 3, "rows": 3, "tiers": 4, "castle": 2, "lateen": false,
-		"livery": {"bottom": "9a5b3c", "wale": "121110", "upper": "15130e",
-			"band": "e0c26a", "lid": "0a0806", "trim": "d4af37", "sail": "e6debf"}},
+		"livery": {"bottom": "d8d2c0", "wale": "a8854e", "topside": "c9a866",
+			"upper": "3f7d74", "band": "b9955f", "lid": "7a4526",
+			"trim": "d4af37", "sail": "e0d8c4"}},
 }
 
 var _masts_n := 2
@@ -201,7 +206,7 @@ func _row_color(r: int) -> Color:
 		0: return _c("bottom")
 		1: return _c("bottom")
 		2: return _c("wale")
-		_: return _c("upper")
+		_: return Color(_lv.get("topside", _lv["upper"]))
 
 
 func _station(t: float, z: float, side: float, r: int) -> Vector3:
@@ -319,7 +324,7 @@ func _build_bulwark_and_strakes() -> void:
 
 	# A wide painted band along every gun deck (the "chequer" stripe) and
 	# a thin trim strake under the rail.
-	var strakes: Array = [{"frac": 0.88, "h": length * 0.006, "color": _c("trim")}]
+	var strakes: Array = [{"frac": 0.97, "h": length * 0.006, "color": _c("trim")}]
 	for row_frac: float in _gun_row_fracs():
 		strakes.append({"frac": row_frac + 0.012, "h": length * 0.024, "color": _c("band")})
 	if _gun_rows == 0:
@@ -419,7 +424,7 @@ func _build_decks_and_stern() -> void:
 		var nw := 4 + _gun_rows
 		for w in nw:
 			var wx := lerpf(-half, half, (float(w) + 0.5) / nw)
-			_box(Vector3(half * 1.5 / nw, _depth * 0.15, 0.12), Vector3(wx, band_y, band_z), Color("101724"))
+			_glass_pane(Vector3(half * 1.5 / nw, _depth * 0.15, 0.12), Vector3(wx, band_y, band_z))
 		# Gilt mouldings above and below each row of glass.
 		_box(Vector3(half * 2.3, _depth * 0.04, 0.14), Vector3(0, band_y + _depth * 0.12, band_z), _c("trim"))
 		_box(Vector3(half * 2.3, _depth * 0.04, 0.14), Vector3(0, band_y - _depth * 0.12, band_z), _c("trim"))
@@ -465,25 +470,27 @@ func _gun_row_fracs() -> Array:
 		0: return []
 		1: return [0.76]
 		2: return [0.64, 0.80]
-		_: return [0.60, 0.72, 0.84]
+		# Three decks need real air between the rows, or the staggered
+		# ports merge into a checkerboard.
+		_: return [0.58, 0.73, 0.88]
 
 
 func _build_cannons() -> void:
-	var n := clampi(int(length / 6.0), 3, 10)
+	var n := clampi(int(length / 3.8), 3, 14)
 	var fracs: Array = _gun_row_fracs()
 	for row in fracs.size():
 		var frac: float = fracs[row]
-		# Lower decks carry more, heavier guns; stagger rows like the real thing.
-		var stagger: float = 0.5 * float(row % 2) / n
+		# Ports line up in straight columns deck over deck, as on the
+		# real ships — staggering them reads as a checkerboard.
 		for side in [-1.0, 1.0]:
 			for i in n:
-				var t := 0.26 + (float(i) / n + stagger) * 0.50
+				var t := 0.16 + (float(i) + 0.5) / n * 0.66
 				var z := -length / 2.0 + t * length
 				var x := _half_width(t)
 				var y := _bottom_y(t) + (_deck_y(t) - _bottom_y(t)) * frac
 				# Black port lid on the painted band — the chequer look.
 				# Layered outward from the band so nothing z-fights.
-				var port_s := length * 0.030
+				var port_s := length * (0.030 if _gun_rows < 3 else 0.024)
 				_box(Vector3(0.12, port_s * 1.25, port_s * 1.25), Vector3(side * (x + 0.16), y, z), _c("lid"))
 				_box(Vector3(0.16, port_s, port_s), Vector3(side * (x + 0.22), y, z), Color("0d0905"))
 				var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
@@ -799,6 +806,20 @@ func _build_bowsprit_and_jibs() -> void:
 	var base := Vector3(0, bow_deck * 0.95, -length * 0.45)
 	var tip := Vector3(0, bow_deck * 1.50, -length * 0.72)
 	_root.add_child(_spar(base, tip, 0.18))
+	# Spritsail: the small square sail slung under the bowsprit of
+	# two-deckers and up — see any man-of-war anatomy plate.
+	if _gun_rows >= 2:
+		var sp := base.lerp(tip, 0.62)
+		var sp_w := _beam * 1.00
+		_root.add_child(_spar(Vector3(-sp_w * 0.5, sp.y, sp.z), Vector3(sp_w * 0.5, sp.y, sp.z), 0.07))
+		var sp_pivot := Node3D.new()
+		sp_pivot.position = Vector3(0, sp.y - 0.12, sp.z)
+		_root.add_child(sp_pivot)
+		var sp_mi := MeshInstance3D.new()
+		sp_mi.mesh = _square_sail_mesh(sp_w * 0.92, sp_w * 0.78, sp.y * 0.55, sp_w * 0.10)
+		sp_mi.material_override = _sail_mat
+		sp_pivot.add_child(sp_mi)
+		_sails.append(sp_pivot)
 	# Two triangular jibs hanging from the fore stay.
 	var masts := _mast_positions()
 	var fore_t: float = masts[0][0]
@@ -892,6 +913,25 @@ func _cylinder(r_top: float, r_bot: float, h: float, pos: Vector3, color: Color)
 	mi.material_override = _flat_material(color)
 	_root.add_child(mi)
 	return mi
+
+
+## Cabin glass: glossy panes with a faint warm glow from inside — the
+## stern gallery reads as real windows, especially after dark.
+func _glass_pane(size: Vector3, pos: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.position = pos
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color("1b2733")
+	m.roughness = 0.06
+	m.metallic = 0.55
+	m.emission_enabled = true
+	m.emission = Color(1.0, 0.78, 0.42)
+	m.emission_energy_multiplier = 0.5
+	mi.material_override = m
+	_root.add_child(mi)
 
 
 func _flat_material(c: Color, unshaded := false) -> StandardMaterial3D:
