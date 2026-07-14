@@ -250,36 +250,36 @@ func _build_hull() -> void:
 	mi.material_override = _wood_mat
 	_root.add_child(mi)
 
-	# Curved stem: a clipper-style sweep from the waterline up and forward
-	# to the figurehead — no straight-post bow.
+	# Curved stem: a short sweep hugging the bow, ending in the figurehead
+	# just under the rail — never a pole above the deck.
+	var bow_deck := _deck_y(0.0)
 	var p0 := Vector3(0, -_depth * 0.15, -length * 0.487)
-	var p1 := Vector3(0, _depth * 0.55, -length * 0.552)   # curve control
-	var p2 := Vector3(0, _depth * 1.30, -length * 0.560)
+	var p1 := Vector3(0, bow_deck * 0.50, -length * 0.530)   # curve control
+	var p2 := Vector3(0, bow_deck * 0.95, -length * 0.540)
 	var prev := p0
-	var segs := 5
+	var segs := 4
 	for i in range(1, segs + 1):
 		var f := float(i) / segs
 		var pt := p0.lerp(p1, f).lerp(p1.lerp(p2, f), f)  # quadratic bezier
-		var r := lerpf(0.30, 0.15, f)
+		var r := lerpf(0.34, 0.20, f)
 		_root.add_child(_spar(prev, pt, r, _c("wale")))
 		prev = pt
-	# Head rails: the curved beak rails sweeping from the hull to the
-	# figurehead on both sides of the stem.
+	# Head rails: short curved beak rails converging on the figurehead.
 	for side in [-1.0, 1.0]:
-		var hr0 := Vector3(side * _beam * 0.22, _depth * 0.60, -length * 0.45)
+		var hr0 := Vector3(side * _beam * 0.20, bow_deck * 0.68, -length * 0.455)
 		var hr_prev := hr0
 		for i in range(1, 4):
 			var f2 := float(i) / 3.0
-			var pt2 := hr0.lerp(p2 + Vector3(0, -_depth * 0.12, 0.2), f2)
-			pt2.y += sin(PI * f2) * _depth * 0.12
+			var pt2 := hr0.lerp(p2, f2)
+			pt2.y += sin(PI * f2) * bow_deck * 0.08
 			_root.add_child(_spar(hr_prev, pt2, 0.07, _c("trim")))
 			hr_prev = pt2
 	var mesh_s := SphereMesh.new()
-	mesh_s.radius = 0.30
-	mesh_s.height = 0.60
+	mesh_s.radius = 0.34
+	mesh_s.height = 0.68
 	var fig := MeshInstance3D.new()
 	fig.mesh = mesh_s
-	fig.position = p2
+	fig.position = p2 + Vector3(0, 0, -0.25)
 	fig.material_override = _flat_material(COLOR_TRIM)
 	_root.add_child(fig)
 
@@ -335,8 +335,9 @@ func _build_bulwark_and_strakes() -> void:
 			var z0 := -length / 2.0 + t0 * length
 			var z1 := -length / 2.0 + t1 * length
 			for side in [-1.0, 1.0]:
-				var w0 := _half_width(t0) * 1.005
-				var w1 := _half_width(t1) * 1.005
+				# A fixed offset off the planking — no z-fighting at any hull size.
+				var w0 := _half_width(t0) + 0.10
+				var w1 := _half_width(t1) + 0.10
 				var y0 := _bottom_y(t0) + (_deck_y(t0) - _bottom_y(t0)) * frac
 				var y1 := _bottom_y(t1) + (_deck_y(t1) - _bottom_y(t1)) * frac
 				var h: float = sdef["h"]
@@ -481,9 +482,10 @@ func _build_cannons() -> void:
 				var x := _half_width(t)
 				var y := _bottom_y(t) + (_deck_y(t) - _bottom_y(t)) * frac
 				# Black port lid on the painted band — the chequer look.
+				# Layered outward from the band so nothing z-fights.
 				var port_s := length * 0.030
-				_box(Vector3(0.12, port_s * 1.25, port_s * 1.25), Vector3(side * x * 1.0, y, z), _c("lid"))
-				_box(Vector3(0.16, port_s, port_s), Vector3(side * x * 1.01, y, z), Color("0d0905"))
+				_box(Vector3(0.12, port_s * 1.25, port_s * 1.25), Vector3(side * (x + 0.16), y, z), _c("lid"))
+				_box(Vector3(0.16, port_s, port_s), Vector3(side * (x + 0.22), y, z), Color("0d0905"))
 				var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
 				barrel.rotation_degrees = Vector3(0, 0, 90)
 				_gun_ports[int(side)].append(Vector3(side * (x + 0.9), y, z))
@@ -792,9 +794,11 @@ func _shrouds(z: float, deck: float, top_y: float) -> void:
 
 
 func _build_bowsprit_and_jibs() -> void:
-	var base := Vector3(0, _depth * 1.15, -length * 0.46)
-	var tip := Vector3(0, _depth * 2.6, -length * 0.78)
-	_root.add_child(_spar(base, tip, 0.20))
+	# A modest, realistically flat bowsprit off the bow rail.
+	var bow_deck := _deck_y(0.0)
+	var base := Vector3(0, bow_deck * 0.95, -length * 0.45)
+	var tip := Vector3(0, bow_deck * 1.50, -length * 0.72)
+	_root.add_child(_spar(base, tip, 0.18))
 	# Two triangular jibs hanging from the fore stay.
 	var masts := _mast_positions()
 	var fore_t: float = masts[0][0]
