@@ -34,19 +34,48 @@ var _gun_ports := {-1: [], 1: []}
 
 ## Rig & hull profile per ship class: mast count, rows of gunports,
 ## square-sail tiers per mast, stern castle stages, lateen rig for the
-## small Mediterranean hulls.
+## small Mediterranean hulls — plus a historical livery.
+## Liveries follow real prototypes: the Royal Navy "Nelson chequer"
+## (black hull, ochre band per gun deck, black port lids), bare-oak
+## Spanish galleons with red upperworks and gold-painted carvings,
+## tanbark (red-brown) working sails on tartanes and luggers, coppered
+## or white-stuff bottoms.
+## livery: bottom (underwater), wale (main hull), upper (upperworks),
+## band (gun-deck stripe), lid (port lids), trim (rails/carvings), sail.
 const PROFILES := {
-	"tartane":    {"masts": 1, "rows": 0, "tiers": 0, "castle": 0, "lateen": true},
-	"lugger":     {"masts": 2, "rows": 1, "tiers": 0, "castle": 0, "lateen": true},
-	"sloop":      {"masts": 2, "rows": 1, "tiers": 2, "castle": 0, "lateen": false},
-	"schooner":   {"masts": 2, "rows": 1, "tiers": 2, "castle": 0, "lateen": false},
-	"barque":     {"masts": 3, "rows": 1, "tiers": 2, "castle": 1, "lateen": false},
-	"brig":       {"masts": 2, "rows": 1, "tiers": 3, "castle": 1, "lateen": false},
-	"galleon":    {"masts": 3, "rows": 2, "tiers": 3, "castle": 2, "lateen": false},
-	"corvette":   {"masts": 3, "rows": 1, "tiers": 3, "castle": 1, "lateen": false},
-	"frigate":    {"masts": 3, "rows": 2, "tiers": 3, "castle": 1, "lateen": false},
-	"battleship": {"masts": 3, "rows": 2, "tiers": 4, "castle": 2, "lateen": false},
-	"manowar":    {"masts": 3, "rows": 3, "tiers": 4, "castle": 2, "lateen": false},
+	"tartane": {"masts": 1, "rows": 0, "tiers": 0, "castle": 0, "lateen": true,
+		"livery": {"bottom": "d8d2c0", "wale": "6b4f30", "upper": "5a3f26",
+			"band": "c9b891", "lid": "1a140e", "trim": "7a5a36", "sail": "a5502f"}},
+	"lugger": {"masts": 2, "rows": 1, "tiers": 0, "castle": 0, "lateen": true,
+		"livery": {"bottom": "d8d2c0", "wale": "2e241b", "upper": "261d15",
+			"band": "cfc4a6", "lid": "16110c", "trim": "6b4f30", "sail": "a5502f"}},
+	"sloop": {"masts": 2, "rows": 1, "tiers": 2, "castle": 0, "lateen": false,
+		"livery": {"bottom": "d8d2c0", "wale": "8a6a43", "upper": "74562f",
+			"band": "e8e0c8", "lid": "1a140e", "trim": "caa14e", "sail": "ded5b8"}},
+	"schooner": {"masts": 2, "rows": 1, "tiers": 2, "castle": 0, "lateen": false,
+		"livery": {"bottom": "9a5b3c", "wale": "15120e", "upper": "191510",
+			"band": "e8e0c8", "lid": "0d0b08", "trim": "b89a5a", "sail": "e6dfc8"}},
+	"barque": {"masts": 3, "rows": 1, "tiers": 2, "castle": 1, "lateen": false,
+		"livery": {"bottom": "d8d2c0", "wale": "4a3826", "upper": "2f4a35",
+			"band": "d9cfa8", "lid": "12100c", "trim": "caa14e", "sail": "dbd2b6"}},
+	"brig": {"masts": 2, "rows": 1, "tiers": 3, "castle": 1, "lateen": false,
+		"livery": {"bottom": "9a5b3c", "wale": "1c1610", "upper": "191410",
+			"band": "c9a54f", "lid": "0d0b08", "trim": "caa14e", "sail": "dbd2b6"}},
+	"galleon": {"masts": 3, "rows": 2, "tiers": 3, "castle": 2, "lateen": false,
+		"livery": {"bottom": "d8d2c0", "wale": "5d4226", "upper": "7a2020",
+			"band": "d4af37", "lid": "3a2416", "trim": "d4af37", "sail": "e2d9bd"}},
+	"corvette": {"masts": 3, "rows": 1, "tiers": 3, "castle": 1, "lateen": false,
+		"livery": {"bottom": "9a5b3c", "wale": "20242e", "upper": "1f2f5c",
+			"band": "e5e0d0", "lid": "12141c", "trim": "d4af37", "sail": "e6dfc8"}},
+	"frigate": {"masts": 3, "rows": 2, "tiers": 3, "castle": 1, "lateen": false,
+		"livery": {"bottom": "9a5b3c", "wale": "141210", "upper": "17140f",
+			"band": "d9b96a", "lid": "0b0906", "trim": "c9a54f", "sail": "e0d8bd"}},
+	"battleship": {"masts": 3, "rows": 2, "tiers": 4, "castle": 2, "lateen": false,
+		"livery": {"bottom": "9a5b3c", "wale": "141210", "upper": "15130e",
+			"band": "c9a54f", "lid": "0a0806", "trim": "d4af37", "sail": "e0d8bd"}},
+	"manowar": {"masts": 3, "rows": 3, "tiers": 4, "castle": 2, "lateen": false,
+		"livery": {"bottom": "9a5b3c", "wale": "121110", "upper": "15130e",
+			"band": "e0c26a", "lid": "0a0806", "trim": "d4af37", "sail": "e6debf"}},
 }
 
 var _masts_n := 2
@@ -54,6 +83,12 @@ var _gun_rows := 1
 var _tiers_n := 3
 var _castle := 1
 var _lateen := false
+var _lv := {}
+
+
+## Livery color lookup.
+func _c(key: String) -> Color:
+	return Color(_lv[key])
 
 
 func build(p_length: float, p_flag: Color, with_crew := true, p_type := "") -> void:
@@ -66,6 +101,7 @@ func build(p_length: float, p_flag: Color, with_crew := true, p_type := "") -> v
 	_tiers_n = int(prof["tiers"])
 	_castle = int(prof["castle"])
 	_lateen = bool(prof["lateen"])
+	_lv = prof["livery"]
 	_root = Node3D.new()
 	add_child(_root)
 	# Heavier classes are beamier and deeper: a man-of-war is a wall of oak.
@@ -116,7 +152,7 @@ func _make_shared_materials() -> void:
 	_wood_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	_sail_mat = StandardMaterial3D.new()
-	_sail_mat.albedo_color = COLOR_SAIL
+	_sail_mat.albedo_color = _c("sail")
 	_sail_mat.albedo_texture = ntex
 	_sail_mat.uv1_triplanar = true
 	_sail_mat.uv1_scale = Vector3(0.6, 0.6, 0.6)
@@ -162,10 +198,10 @@ const ROWS := [
 
 func _row_color(r: int) -> Color:
 	match r:
-		0: return COLOR_BOTTOM
-		1: return COLOR_BOTTOM
-		2: return COLOR_LOWER
-		_: return COLOR_UPPER
+		0: return _c("bottom")
+		1: return _c("bottom")
+		2: return _c("wale")
+		_: return _c("upper")
 
 
 func _station(t: float, z: float, side: float, r: int) -> Vector3:
@@ -207,7 +243,7 @@ func _build_hull() -> void:
 		_quad(st,
 			_station(1.0, zt, -1.0, r), _station(1.0, zt, 1.0, r),
 			_station(1.0, zt, 1.0, r + 1), _station(1.0, zt, -1.0, r + 1),
-			COLOR_UPPER if r >= 2 else COLOR_BOTTOM, false)
+			_c("upper") if r >= 2 else _c("bottom"), false)
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
@@ -225,8 +261,19 @@ func _build_hull() -> void:
 		var f := float(i) / segs
 		var pt := p0.lerp(p1, f).lerp(p1.lerp(p2, f), f)  # quadratic bezier
 		var r := lerpf(0.30, 0.15, f)
-		_root.add_child(_spar(prev, pt, r, COLOR_UPPER))
+		_root.add_child(_spar(prev, pt, r, _c("wale")))
 		prev = pt
+	# Head rails: the curved beak rails sweeping from the hull to the
+	# figurehead on both sides of the stem.
+	for side in [-1.0, 1.0]:
+		var hr0 := Vector3(side * _beam * 0.22, _depth * 0.60, -length * 0.45)
+		var hr_prev := hr0
+		for i in range(1, 4):
+			var f2 := float(i) / 3.0
+			var pt2 := hr0.lerp(p2 + Vector3(0, -_depth * 0.12, 0.2), f2)
+			pt2.y += sin(PI * f2) * _depth * 0.12
+			_root.add_child(_spar(hr_prev, pt2, 0.07, _c("trim")))
+			hr_prev = pt2
 	var mesh_s := SphereMesh.new()
 	mesh_s.radius = 0.30
 	mesh_s.height = 0.60
@@ -260,21 +307,26 @@ func _build_bulwark_and_strakes() -> void:
 			var d := _station(t1, z1, side, ROWS.size() - 1)
 			var b := a + Vector3(0, bh, 0)
 			var c := d + Vector3(0, bh, 0)
-			_quad(st, a, b, c, d, COLOR_UPPER, side > 0.0)
-			_quad(st, a, b, c, d, COLOR_UPPER, side < 0.0)  # inner face too
+			_quad(st, a, b, c, d, _c("upper"), side > 0.0)
+			_quad(st, a, b, c, d, _c("upper"), side < 0.0)  # inner face too
 			# Cap rail.
-			_quad(st, b, b + Vector3(side * -0.3, 0.1, 0), c + Vector3(side * -0.3, 0.1, 0), c, COLOR_TRIM, side > 0.0)
+			_quad(st, b, b + Vector3(side * -0.3, 0.1, 0), c + Vector3(side * -0.3, 0.1, 0), c, _c("trim"), side > 0.0)
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = _wood_mat
 	_root.add_child(mi)
 
-	# An ochre strake framing every gun deck (plus one at the rail).
-	var strake_fracs: Array = [0.86]
+	# A wide painted band along every gun deck (the "chequer" stripe) and
+	# a thin trim strake under the rail.
+	var strakes: Array = [{"frac": 0.88, "h": length * 0.006, "color": _c("trim")}]
 	for row_frac: float in _gun_row_fracs():
-		strake_fracs.append(row_frac + 0.085)
-	for frac: float in strake_fracs:
+		strakes.append({"frac": row_frac + 0.012, "h": length * 0.024, "color": _c("band")})
+	if _gun_rows == 0:
+		strakes.append({"frac": 0.70, "h": length * 0.010, "color": _c("band")})
+	for sdef: Dictionary in strakes:
+		var frac: float = sdef["frac"]
+		var band_c: Color = sdef["color"]
 		var strip := SurfaceTool.new()
 		strip.begin(Mesh.PRIMITIVE_TRIANGLES)
 		for i in steps:
@@ -287,15 +339,15 @@ func _build_bulwark_and_strakes() -> void:
 				var w1 := _half_width(t1) * 1.005
 				var y0 := _bottom_y(t0) + (_deck_y(t0) - _bottom_y(t0)) * frac
 				var y1 := _bottom_y(t1) + (_deck_y(t1) - _bottom_y(t1)) * frac
-				var h := length * 0.008
+				var h: float = sdef["h"]
 				_quad(strip,
 					Vector3(side * w0, y0 - h, z0), Vector3(side * w0, y0 + h, z0),
 					Vector3(side * w1, y1 + h, z1), Vector3(side * w1, y1 - h, z1),
-					COLOR_STRAKE, side > 0.0)
+					band_c, side > 0.0)
 		strip.generate_normals()
 		var smi := MeshInstance3D.new()
 		smi.mesh = strip.commit()
-		smi.material_override = _flat_material(COLOR_STRAKE)
+		smi.material_override = _flat_material(band_c)
 		_root.add_child(smi)
 
 
@@ -320,7 +372,7 @@ func _castle_loft(t0: float, t1: float, y0: float, h: float, w_mult: float) -> v
 			_quad(st,
 				Vector3(side * wa, base_a, za), Vector3(side * wa * lean, base_a + h, za),
 				Vector3(side * wb * lean, base_b + h, zb), Vector3(side * wb, base_b, zb),
-				COLOR_UPPER, side > 0.0)
+				_c("upper"), side > 0.0)
 		# Roof deck.
 		_quad(st,
 			Vector3(wa * lean, base_a + h, za), Vector3(-wa * lean, base_a + h, za),
@@ -334,7 +386,7 @@ func _castle_loft(t0: float, t1: float, y0: float, h: float, w_mult: float) -> v
 		_quad(st,
 			Vector3(-w, base, z), Vector3(-w * lean, base + h, z),
 			Vector3(w * lean, base + h, z), Vector3(w, base, z),
-			COLOR_UPPER, false)
+			_c("upper"), false)
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
@@ -355,15 +407,23 @@ func _build_decks_and_stern() -> void:
 		var fc_h := _depth * 0.35
 		_castle_loft(0.02, 0.17, 0.0, fc_h, 0.92)
 
-	# Stern: window bands (one per gun deck), gold mouldings, galleries.
+	# Stern galleries: rows of individual windows framed by gilt mouldings,
+	# following the raked transom.
 	var top_y := _deck_y(1.0) + qd_h + pd_h
 	var bands := clampi(_gun_rows, 1, 2) + (1 if _castle >= 2 else 0)
 	for b in bands:
-		var band_y := top_y - _depth * (0.30 + 0.34 * b)
-		_box(Vector3(_beam * (0.60 - 0.06 * b), _depth * 0.22, 0.16), Vector3(0, band_y, length * 0.505), Color("14100a"))
-		_box(Vector3(_beam * 0.66, _depth * 0.05, 0.2), Vector3(0, band_y + _depth * 0.15, length * 0.505), COLOR_TRIM)
+		var band_y := top_y - _depth * (0.30 + 0.36 * b)
+		var band_z := length * (0.535 - 0.014 * b)
+		var half := _beam * (0.30 - 0.03 * b)
+		var nw := 4 + _gun_rows
+		for w in nw:
+			var wx := lerpf(-half, half, (float(w) + 0.5) / nw)
+			_box(Vector3(half * 1.5 / nw, _depth * 0.15, 0.12), Vector3(wx, band_y, band_z), Color("101724"))
+		# Gilt mouldings above and below each row of glass.
+		_box(Vector3(half * 2.3, _depth * 0.04, 0.14), Vector3(0, band_y + _depth * 0.12, band_z), _c("trim"))
+		_box(Vector3(half * 2.3, _depth * 0.04, 0.14), Vector3(0, band_y - _depth * 0.12, band_z), _c("trim"))
 	for side in [-1.0, 1.0]:
-		_box(Vector3(_beam * 0.10, _depth * (0.4 + 0.25 * _castle), length * 0.10), Vector3(side * _beam * 0.40, top_y - _depth * 0.35, length * 0.44), COLOR_UPPER, _wood_mat)
+		_box(Vector3(_beam * 0.10, _depth * (0.4 + 0.25 * _castle), length * 0.10), Vector3(side * _beam * 0.40, top_y - _depth * 0.35, length * 0.46), _c("upper"), _wood_mat)
 		# Lantern: warm emissive sphere on a post.
 		var lm := StandardMaterial3D.new()
 		lm.albedo_color = Color(1.0, 0.85, 0.5)
@@ -420,9 +480,9 @@ func _build_cannons() -> void:
 				var z := -length / 2.0 + t * length
 				var x := _half_width(t)
 				var y := _bottom_y(t) + (_deck_y(t) - _bottom_y(t)) * frac
-				# Port lid frame, dark port, barrel poking out.
+				# Black port lid on the painted band — the chequer look.
 				var port_s := length * 0.030
-				_box(Vector3(0.12, port_s * 1.25, port_s * 1.25), Vector3(side * x * 1.0, y, z), Color("6d4a26"))
+				_box(Vector3(0.12, port_s * 1.25, port_s * 1.25), Vector3(side * x * 1.0, y, z), _c("lid"))
 				_box(Vector3(0.16, port_s, port_s), Vector3(side * x * 1.01, y, z), Color("0d0905"))
 				var barrel := _cylinder(0.09, 0.11, 0.9, Vector3(side * (x + 0.35), y - 0.05, z), Color("15130f"))
 				barrel.rotation_degrees = Vector3(0, 0, 90)
