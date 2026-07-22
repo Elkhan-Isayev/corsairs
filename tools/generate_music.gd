@@ -103,6 +103,76 @@ func _noise_burst(buf: PackedFloat32Array, start_s: float, amp: float, decay_s: 
 		buf[idx] += lp * amp * exp(-float(i) / d)
 
 
+## Brass-style stab: two mildly detuned "horns" in unison, punchy exponential
+## attack and a bright harmonic stack — for fanfares and battle accents.
+func _brass(buf: PackedFloat32Array, start_s: float, dur_s: float, freq: float,
+		amp: float, attack_s: float, release_s: float) -> void:
+	var start := int(start_s * RATE)
+	var n := int(dur_s * RATE)
+	var atk := maxi(int(attack_s * RATE), 1)
+	var rel := maxi(int(release_s * RATE), 1)
+	var w := TAU * freq / RATE
+	var w2 := TAU * freq * 1.006 / RATE
+	var harmonics := [1.0, 0.55, 0.35, 0.22, 0.14, 0.08]
+	for i in n:
+		var idx := start + i
+		if idx >= buf.size():
+			break
+		var env := 1.0
+		if i < atk:
+			env = float(i) / atk
+		if i > n - rel:
+			env = minf(env, float(n - i) / rel)
+		env = env * env
+		var s := 0.0
+		for h in harmonics.size():
+			s += harmonics[h] * (sin(w * (h + 1) * i) + sin(w2 * (h + 1) * i)) * 0.5
+		buf[idx] += s * amp * env
+
+
+## Tuned war drum: a low sine body with pitch-rich overtone plus a sharp
+## noise strike transient, for timpani hits and war-drum accents.
+func _timpani(buf: PackedFloat32Array, start_s: float, amp: float, decay_s: float,
+		rng: RandomNumberGenerator) -> void:
+	var start := int(start_s * RATE)
+	var n := int(decay_s * RATE * 4.0)
+	var d := decay_s * RATE
+	var freq := 64.0
+	var w := TAU * freq / RATE
+	for i in n:
+		var idx := start + i
+		if idx >= buf.size():
+			break
+		var env := exp(-float(i) / d)
+		buf[idx] += (sin(w * i) + 0.5 * sin(w * 2.02 * i)) * env * amp
+	var strike := int(0.012 * RATE)
+	for i in strike:
+		var idx := start + i
+		if idx >= buf.size():
+			break
+		buf[idx] += rng.randf_range(-1.0, 1.0) * amp * 0.6 * exp(-float(i) / (0.003 * RATE))
+
+
+## Driving tremolo strings: a fast amplitude pulse under a sustained tone —
+## the tense ostinato bed under battle brass.
+func _tremolo_strings(buf: PackedFloat32Array, start_s: float, dur_s: float, freq: float,
+		amp: float, rate_hz: float) -> void:
+	var start := int(start_s * RATE)
+	var n := int(dur_s * RATE)
+	var atk := maxi(int(0.02 * RATE), 1)
+	var w := TAU * freq / RATE
+	for i in n:
+		var idx := start + i
+		if idx >= buf.size():
+			break
+		var env := 1.0
+		if i < atk:
+			env = float(i) / atk
+		var trem := 0.6 + 0.4 * (0.5 + 0.5 * sin(TAU * rate_hz * i / RATE))
+		var s := sin(w * i) + 0.3 * sin(w * 2.0 * i) + 0.15 * sin(w * 3.0 * i)
+		buf[idx] += s * amp * env * trem
+
+
 # --- Tracks ---
 
 ## Soft lead voice: near-sine with gentle vibrato, slow attack/release.
@@ -153,19 +223,36 @@ const FS3 := 185.0
 const B3 := 246.94
 const FS4 := 369.99
 const B4 := 493.88
+const GS3 := 207.65
 
 
-## Bright main theme: C major, 78 bpm, 16 bars — majors only, no minor
-## chord anywhere, so it cannot sound melancholic.
-## Guitar-style broken chords, soft bass, and a pentatonic melody that only
+## Bright main theme: C major, 84 bpm, 18 bars — majors only, no minor
+## chord anywhere, so it cannot sound melancholic, but bookended with a
+## brass-and-timpani fanfare so it reads as an adventure theme, not a lullaby.
+## Guitar-style broken chords, driving bass, and a pentatonic melody that only
 ## uses tones of the current chord — nothing can clash by construction.
 func _render_theme() -> PackedFloat32Array:
-	var bpm := 78.0
+	var bpm := 84.0
 	var beat := 60.0 / bpm
 	var bar := beat * 4.0
-	var total := bar * 16.0
+	var intro_bars := 2.0
+	var total := bar * (16.0 + intro_bars)
 	var buf := PackedFloat32Array()
 	buf.resize(int(total * RATE))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42
+	var offset := intro_bars * bar
+
+	# Bold rising brass call before the sails unfurl, with timpani punctuation.
+	var fanfare := [
+		[0.0, C4, 0.6], [0.6, E4, 0.6], [1.2, G4, 0.9], [2.2, C5, 1.6],
+	]
+	for note in fanfare:
+		var t: float = float(note[0]) * beat
+		_brass(buf, t, float(note[2]) * beat, float(note[1]), 0.16, 0.01, beat * 0.3)
+	_timpani(buf, 0.0, 0.22, 0.5, rng)
+	_timpani(buf, beat * 2.0, 0.18, 0.4, rng)
+	_tone(buf, 0.0, bar * 2.0 - 0.05, C3, 0.05, 0.05, beat, [1.0, 0.3, 0.1])
 
 	# Two passes over: C  F  C  G — all sunshine.
 	var chords := [
@@ -178,14 +265,16 @@ func _render_theme() -> PackedFloat32Array:
 	var pick := [0, 1, 2, 3, 2, 1, 2, 1]
 	for b in 16:
 		var ch: Dictionary = chords[b % 4]
-		var t0 := b * bar
+		var t0 := offset + b * bar
 		var arp: Array = ch["arp"]
 		for e in 8:
 			var f: float = arp[pick[e]]
-			_pluck(buf, t0 + e * beat * 0.5, f, 0.055, 0.7)
+			_pluck(buf, t0 + e * beat * 0.5, f, 0.075, 0.7)
 		# Bass: root on 1, a lighter fifth on 3.
-		_tone(buf, t0, beat * 1.8, ch["bass"], 0.085, 0.015, beat * 0.8, [1.0, 0.18])
-		_tone(buf, t0 + beat * 2.0, beat * 1.6, float(arp[2]) * 0.5, 0.045, 0.015, beat * 0.7, [1.0, 0.18])
+		_tone(buf, t0, beat * 1.8, ch["bass"], 0.11, 0.015, beat * 0.8, [1.0, 0.22])
+		_tone(buf, t0 + beat * 2.0, beat * 1.6, float(arp[2]) * 0.5, 0.06, 0.015, beat * 0.7, [1.0, 0.18])
+		# A marching timpani pulse keeps the fanfare's energy alive underneath.
+		_timpani(buf, t0, 0.09, 0.25, rng)
 
 	# Melody phrase over 8 bars: [start_beat, freq, dur_beats].
 	# Every long note is a tone of the chord sounding under it.
@@ -199,14 +288,23 @@ func _render_theme() -> PackedFloat32Array:
 		[24.0, G4, 1.0], [25.0, E4, 1.0], [26.0, G4, 2.0], # C
 		[28.0, D5, 2.0], [30.0, G4, 1.5],                  # G
 	]
-	# Pass 1: harp plucks.  Pass 2: a soft flute takes the same phrase.
+	# Pass 1: harp plucks.  Pass 2: a soft flute takes the same phrase, with
+	# brass doubling the final two bars for a triumphant close.
 	for note in phrase:
-		var t: float = float(note[0]) * beat
-		_pluck(buf, t, float(note[1]), 0.10, 1.1)
+		var t: float = offset + float(note[0]) * beat
+		_pluck(buf, t, float(note[1]), 0.13, 1.1)
 	for note in phrase:
-		var t: float = bar * 8.0 + float(note[0]) * beat
-		_lead(buf, t, float(note[2]) * beat, float(note[1]), 0.055)
-		_pluck(buf, t, float(note[1]) * 0.5, 0.035, 1.2)
+		var t: float = offset + bar * 8.0 + float(note[0]) * beat
+		_lead(buf, t, float(note[2]) * beat, float(note[1]), 0.075)
+		_pluck(buf, t, float(note[1]) * 0.5, 0.045, 1.2)
+		if float(note[0]) >= 24.0:
+			_brass(buf, t, float(note[2]) * beat, float(note[1]), 0.11, 0.02, beat * 0.3)
+	# Full-ensemble stinger on the last chord: brass, bass and timpani together.
+	var end_t: float = offset + bar * 8.0 + 30.0 * beat
+	_brass(buf, end_t, beat * 2.0, C5, 0.18, 0.01, beat * 1.2)
+	_brass(buf, end_t, beat * 2.0, G4, 0.14, 0.01, beat * 1.2)
+	_tone(buf, end_t, beat * 2.0, C3, 0.12, 0.01, beat * 1.2, [1.0, 0.3, 0.1])
+	_timpani(buf, end_t, 0.22, 0.5, rng)
 	return buf
 
 
@@ -362,10 +460,11 @@ func _render_town(cfg: Dictionary) -> PackedFloat32Array:
 	return buf
 
 
-## Battle track: A minor, 96 bpm, 8 bars — driving low strings and war drums.
-## Harmony stays on Am / F / E chord tones, so it is tense but never sour.
+## Battle track: A minor, 112 bpm, 8 bars — tremolo strings, brass stabs and
+## war drums. Harmony stays on Am / F / E7 chord tones, so it is tense but
+## never sour — the tension comes from volume, drive and brass, not clashing notes.
 func _render_battle() -> PackedFloat32Array:
-	var bpm := 96.0
+	var bpm := 112.0
 	var beat := 60.0 / bpm
 	var bar := beat * 4.0
 	var total := bar * 8.0
@@ -374,31 +473,52 @@ func _render_battle() -> PackedFloat32Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 
-	# Low string ostinato, eighths: changes with the chord underneath.
+	# Tremolo string ostinato, eighths: changes with the chord underneath.
 	var ost_am := [A2, A2, C3, A2, E3, A2, C3, A2]
 	var ost_f := [F2, F2, A2, F2, C3, F2, A2, F2]
-	var ost_e := [E2, E2, G3 / 2.0, E2, 123.47, E2, G3 / 2.0, E2]  # E B G# -> E minor-major color
+	var ost_e := [E2, E2, GS3, E2, B3, E2, GS3, E2]  # E G# B -> E major dominant bite
 	# 8-bar arc: Am Am F Am | Am F E Am
 	var bars := [ost_am, ost_am, ost_f, ost_am, ost_am, ost_f, ost_e, ost_am]
 	var swell := [A3, A3, F3, A3, A3, F3, E3 * 2.0, A3]
+	# Off-beat brass stabs — the classic "and" of 2 and 4 — ride the same arc.
+	var stab_hi := [C4, C4, A3, C4, C4, A3, GS3 * 2.0, C4]
+
+	# A short rising-then-falling fanfare hook, chord-tone only, grows louder
+	# toward the end so the whole piece feels like it's building to a fight.
+	var hook := [
+		[0.0, A3, 0.5], [0.5, C4, 0.5], [1.0, E4, 1.0], [2.0, C4, 0.5], [2.5, A3, 1.5],
+	]
+
 	for b in 8:
 		var ost: Array = bars[b]
+		var t0 := b * bar
 		for e in 8:
-			var t := b * bar + e * beat * 0.5
-			_pluck(buf, t, float(ost[e]), 0.085, 0.20)
+			var t := t0 + e * beat * 0.5
+			_tremolo_strings(buf, t, beat * 0.55, float(ost[e]), 0.07, 14.0)
 		# One restrained string swell per bar, always a chord tone.
-		_tone(buf, b * bar, bar * 0.85, float(swell[b]), 0.04, bar * 0.35, bar * 0.35, [1.0, 0.35, 0.12])
+		_tone(buf, t0, bar * 0.85, float(swell[b]), 0.05, bar * 0.35, bar * 0.35, [1.0, 0.35, 0.12])
+		# Brass stabs on the off-beats — tension without dissonance.
+		_brass(buf, t0 + beat * 1.5, beat * 0.4, float(stab_hi[b]), 0.11, 0.006, beat * 0.25)
+		_brass(buf, t0 + beat * 3.5, beat * 0.4, float(ost[0]) * 2.0, 0.11, 0.006, beat * 0.25)
+		# The fanfare hook rides on top every other bar, louder each time.
+		if b % 2 == 1:
+			var loud: float = 0.11 + 0.06 * (float(b) / 7.0)
+			for note in hook:
+				var t: float = t0 + float(note[0]) * beat
+				_brass(buf, t, float(note[2]) * beat, float(note[1]), loud, 0.01, beat * 0.15)
 
-	# War drums: deep hit on 1 and 3, snare answer on 4.
+	# War drums: timpani on 1 and 3, snare answer on 4, rolling into the bar.
 	for b in 8:
-		for k in 4:
-			var t := b * bar + k * beat
-			if k % 2 == 0:
-				_tone(buf, t, 0.20, 52.0, 0.20, 0.004, 0.16, [1.0, 0.3])
-			if k == 3:
-				_noise_burst(buf, t, 0.10, 0.06, rng)
-		# A quiet double-tap leading into the next bar.
-		_tone(buf, b * bar + 3.5 * beat, 0.12, 52.0, 0.11, 0.004, 0.10, [1.0])
+		_timpani(buf, b * bar, 0.20, 0.4, rng)
+		_timpani(buf, b * bar + beat * 2.0, 0.17, 0.32, rng)
+		_noise_burst(buf, b * bar + beat * 3.0, 0.10, 0.06, rng)
+		if b == 7:
+			# Final bar: a triple hit for a big finish.
+			_timpani(buf, b * bar + beat * 3.3, 0.20, 0.25, rng)
+			_timpani(buf, b * bar + beat * 3.6, 0.24, 0.3, rng)
+		else:
+			# A quiet double-tap leading into the next bar.
+			_tone(buf, b * bar + 3.5 * beat, 0.12, 52.0, 0.11, 0.004, 0.10, [1.0])
 	return buf
 
 
