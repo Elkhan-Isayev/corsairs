@@ -62,11 +62,12 @@ static func build(cloth: Color, skin: Color = SKIN_DEFAULT, skirted := false,
 		root.add_child(pivot)
 		out[limb[0]] = pivot
 		drive[pivot] = skel.find_bone(limb[1])
-		# The models are rigged in an A-pose: let the arms hang at the sides.
+		# The models are rigged in an A-pose: lower the arms toward the sides,
+		# but keep the hands clear of coats and skirts, slightly forward.
 		if limb[0] == "l_arm":
-			base[pivot] = Quaternion(Vector3.BACK, 0.62)
+			base[pivot] = Quaternion(Vector3.RIGHT, 0.12) * Quaternion(Vector3.BACK, 0.34)
 		elif limb[0] == "r_arm":
-			base[pivot] = Quaternion(Vector3.BACK, -0.62)
+			base[pivot] = Quaternion(Vector3.RIGHT, 0.12) * Quaternion(Vector3.BACK, -0.34)
 	root.setup(skel, drive, base)
 
 	if with_sword:

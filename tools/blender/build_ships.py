@@ -3,8 +3,9 @@
     /Applications/Blender.app/Contents/MacOS/Blender -b -P tools/blender/build_ships.py \
         -- [--only brig,frigate] [--preview DIR] [--no-export]
 
-Writes assets/ships/<type>.gltf (+ .bin, textures/*.jpg). Every hull is built at MODEL_LENGTH metres
-and scaled at runtime by scripts/ship_visual.gd, which keeps the same deck
+Writes assets/ships/<type>.gltf (+ .bin, textures/*.jpg). Every hull is built at its
+class's real battle length (18 + (8 - rank) * 5 m, see class_len) and scaled at runtime
+by scripts/ship_visual.gd, which keeps the same deck
 measurements (beam, depth, deck sheer, half-width) for crew and boarding —
 keep half_width/deck_y/bottom_y here in sync with that script.
 
@@ -27,7 +28,6 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 
-MODEL_LENGTH = 30.0
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT_DIR = os.path.join(ROOT, "assets", "ships")
 TMP_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "corsairs_ship_tex")
@@ -62,19 +62,19 @@ PROFILES = {
             "band": "d9cfa8", "lid": "12100c", "trim": "caa14e", "sail": "dbd2b6"}},
     "brig": {"masts": 2, "rows": 1, "tiers": 3, "castle": 1, "lateen": False, "rank": 5,
         "livery": {"bottom": "9a5b3c", "wale": "1c1610", "upper": "1d1813",
-            "band": "c9a54f", "lid": "0d0b08", "trim": "caa14e", "sail": "dbd2b6"}},
+            "band": "b0975a", "lid": "0d0b08", "trim": "caa14e", "sail": "dbd2b6"}},
     "galleon": {"masts": 3, "rows": 2, "tiers": 3, "castle": 2, "lateen": False, "rank": 4,
-        "livery": {"bottom": "d8d2c0", "wale": "6a4b2b", "upper": "7a2020",
-            "band": "d4af37", "lid": "3a2416", "trim": "d4af37", "sail": "e2d9bd"}},
+        "livery": {"bottom": "d8d2c0", "wale": "4b3523", "upper": "6e2620",
+            "band": "a48b4e", "lid": "3a2416", "trim": "c2a050", "sail": "e2d9bd"}},
     "corvette": {"masts": 3, "rows": 1, "tiers": 3, "castle": 1, "lateen": False, "rank": 3,
         "livery": {"bottom": "9a5b3c", "wale": "20242e", "upper": "1f2f5c",
             "band": "e5e0d0", "lid": "12141c", "trim": "d4af37", "sail": "e6dfc8"}},
     "frigate": {"masts": 3, "rows": 2, "tiers": 3, "castle": 1, "lateen": False, "rank": 2,
         "livery": {"bottom": "9a5b3c", "wale": "141210", "upper": "17140f",
-            "band": "d9b96a", "lid": "0b0906", "trim": "c9a54f", "sail": "e0d8bd"}},
+            "band": "bfa36a", "lid": "0b0906", "trim": "c9a54f", "sail": "e0d8bd"}},
     "battleship": {"masts": 3, "rows": 2, "tiers": 4, "castle": 2, "lateen": False, "rank": 1,
         "livery": {"bottom": "9a5b3c", "wale": "141210", "upper": "15130e",
-            "band": "c9a54f", "lid": "0a0806", "trim": "d4af37", "sail": "e0d8bd"}},
+            "band": "b39a5e", "lid": "0a0806", "trim": "d4af37", "sail": "e0d8bd"}},
     # Sea Dogs look: light oak planking, verdigris-teal upperworks, gilt.
     "manowar": {"masts": 3, "rows": 3, "tiers": 4, "castle": 2, "lateen": False, "rank": 1,
         "livery": {"bottom": "d8d2c0", "wale": "a8854e", "topside": "c9a866",
@@ -461,6 +461,16 @@ def build_nation_textures():
         save_texture(os.path.join(NATION_DIR, f"{nation}_flag.jpg"), flag_cloth(nation))
 
 
+def normal_from_height(h, strength=2.0):
+    """Tangent-space normal map (RGBA) from a height field (rows bottom-up)."""
+    gx = (np.roll(h, -1, axis=1) - np.roll(h, 1, axis=1)) * strength
+    gy = (np.roll(h, -1, axis=0) - np.roll(h, 1, axis=0)) * strength
+    n = np.stack([-gx, -gy, np.ones_like(h)], axis=2)
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    rgb = n * 0.5 + 0.5
+    return np.concatenate([rgb, np.ones(h.shape + (1,), np.float32)], axis=2).astype(np.float32)
+
+
 def make_image(name, rgba):
     os.makedirs(TMP_DIR, exist_ok=True)
     h, w = rgba.shape[:2]
@@ -481,7 +491,7 @@ class ShipBuilder:
         p = PROFILES[type_id]
         self.p = p
         self.lv = p["livery"]
-        self.L = MODEL_LENGTH
+        self.L = 18.0 + (8 - p["rank"]) * 5.0
         self.rows = p["rows"]
         self.castle = p["castle"]
         self.beam = self.L * (0.26 + 0.014 * self.rows)
@@ -498,12 +508,12 @@ class ShipBuilder:
 
     def half_width(self, t):
         if t < 0.36:
-            w = 1.0 - (1.0 - t / 0.36) ** 2.4
+            w = 1.0 - (1.0 - t / 0.36) ** 2.2
         elif t < 0.70:
             w = 1.0
         else:
             w = 1.0 - 0.38 * smoothstep(0.70, 1.0, t)
-        return self.beam * 0.5 * max(w, 0.035)
+        return self.beam * 0.5 * max(w, 0.0)
 
     def deck_y(self, t):
         return self.depth * (0.70 + 0.5 * (abs(t - 0.42) / 0.58) ** 1.8)
@@ -563,7 +573,7 @@ class ShipBuilder:
     # --- materials ---
 
     def material(self, name, color, rough=0.8, metal=0.0, image=None, emission=None,
-                 emit_strength=0.0, double=True):
+                 emit_strength=0.0, double=True, normal=None):
         m = bpy.data.materials.new(f"{self.type_id}_{name}")
         m.use_nodes = True
         m.use_backface_culling = not double
@@ -576,6 +586,13 @@ class ShipBuilder:
             tex = nt.nodes.new("ShaderNodeTexImage")
             tex.image = image
             nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        if normal is not None:
+            normal.colorspace_settings.name = "Non-Color"
+            ntex = nt.nodes.new("ShaderNodeTexImage")
+            ntex.image = normal
+            nmap = nt.nodes.new("ShaderNodeNormalMap")
+            nt.links.new(ntex.outputs["Color"], nmap.inputs["Color"])
+            nt.links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
         if emission is not None:
             bsdf.inputs["Emission Color"].default_value = (*to_linear(emission), 1.0)
             bsdf.inputs["Emission Strength"].default_value = emit_strength
@@ -584,17 +601,21 @@ class ShipBuilder:
 
     def make_materials(self):
         lv = self.lv
-        self.material("hull", (1, 1, 1), 0.72, image=self.hull_texture())
+        hull_img = self.hull_texture()
+        self.material("hull", (1, 1, 1), 0.72, image=hull_img,
+                      normal=make_image(f"{self.type_id}_hull_n", normal_from_height(self.hull_height, 3.0)))
         up = detail("planks", 256, 256, 1, 1, contrast=0.8) * planks(256, 256, 9, 150, self.rng, seam=0.85, var=0.05)
         up_tex = to_rgba(up, hexcol(lv["upper"]))
-        self.material("upper", (1, 1, 1), 0.75, image=make_image(f"{self.type_id}_upper", up_tex))
+        self.material("upper", (1, 1, 1), 0.75, image=make_image(f"{self.type_id}_upper", up_tex),
+                      normal=make_image(f"{self.type_id}_upper_n", normal_from_height(up, 2.5)))
         # One deck texture shared by every ship (fixed seed).
         deck = detail("planks", 256, 256, 1, 1, contrast=0.6) * planks(256, 256, 10, 210, np.random.default_rng(7), seam=0.7, var=0.08)
         yy, xx = np.mgrid[0:256, 0:256]
         nails = (((xx % 52) < 2) & (((yy + 6) % 25) < 2))          # treenails
         deck[nails] *= 0.6
         self.material("deck", (1, 1, 1), 0.85,
-                      image=make_image("deck", to_rgba(deck, hexcol("b39468"))))
+                      image=make_image("deck", to_rgba(deck, hexcol("b39468"))),
+                      normal=make_image("deck_n", normal_from_height(deck, 2.5)))
         self.material("trim", hexcol(lv["trim"], 0.8), 0.45, 0.4)
         self.material("rail", hexcol("3a2817"), 0.75)
         self.material("wale", hexcol(lv["wale"], 0.45), 0.7)
@@ -606,7 +627,7 @@ class ShipBuilder:
         self.material("spar_black", hexcol("14100c"), 0.7)
         self.material("rope", hexcol("17120d"), 0.9)
         self.material("grating", hexcol("4a3520"), 0.9)
-        self.material("glass", hexcol("23303c"), 0.08, 0.3, emission=hexcol("ffc46a"), emit_strength=0.35)
+        self.material("glass", hexcol("10161c"), 0.08, 0.3, emission=hexcol("ffc46a"), emit_strength=0.12)
         self.material("lantern", hexcol("ffe2a0"), 0.3, emission=hexcol("ffb44a"), emit_strength=5.0)
         self.material("sail", (1, 1, 1), 0.95,
                       image=make_image(f"{self.type_id}_sail", self.sail_texture()))
@@ -640,11 +661,11 @@ class ShipBuilder:
         img[:] = base
         # Painted bands along every gun deck.
         for fr in self.gun_row_fracs():
-            hh = (self.L * 0.024) / span
+            hh = (self.port_size() * 0.64) / span
             m = (np.abs(V - (fr + 0.012)) < hh[None, :])
             img[m] = band
         if self.rows == 0:
-            m = np.abs(V - 0.80) < (self.L * 0.008) / span[None, :]
+            m = np.abs(V - 0.80) < 0.22 / span[None, :]
             img[m] = band
         # Gilt strake under the rail and boot-topping at the waterline.
         img[np.abs(V - 0.975) < (0.05 / span)[None, :]] = trim
@@ -653,6 +674,7 @@ class ShipBuilder:
         under = V < wl[None, :]
         img[under] = bottom
         shade = gray.copy()
+        self.hull_height = gray.copy()
         if copper:
             # Copper sheathing: small plates with green patina blotches.
             yy, xx = np.mgrid[0:H, 0:W]
@@ -706,6 +728,10 @@ class ShipBuilder:
 
     def gun_row_fracs(self):
         return {0: [], 1: [0.76], 2: [0.64, 0.80]}.get(self.rows, [0.58, 0.73, 0.88])
+
+    def port_size(self):
+        """Real gunport: about 0.65 m square (a bit smaller on three-deckers)."""
+        return 0.66 if self.rows < 3 else 0.58
 
     def port_count(self):
         return min(max(int(self.class_len / 3.8), 3), 14)
@@ -860,6 +886,27 @@ class ShipBuilder:
         for p in pts:
             b.box(p - Vector((0, rail_h / 2, 0)), (0.08, rail_h, 0.08), "rail")
 
+    def ribbon(self, fs, base_fn, fwd_fn, depth_fn, half_w, mat):
+        """A flat-sided timber along a centre-line curve: back edge on the
+        curve (tucked into the hull), front edge `depth` ahead of it."""
+        b = self.body
+        left, right, fl, fr = [], [], [], []
+        for f in fs:
+            p0 = base_fn(f)
+            fwd = fwd_fn(f)
+            back = p0 - fwd * 0.25
+            front = p0 + fwd * depth_fn(f)
+            w = half_w(f)
+            left.append(back + Vector((-w, 0, 0)))
+            right.append(back + Vector((w, 0, 0)))
+            fl.append(front + Vector((-w, 0, 0)))
+            fr.append(front + Vector((w, 0, 0)))
+        b.grid([left, fl], mat, smooth=False)
+        b.grid([fr, right], mat, smooth=False)
+        b.grid([fl, fr], mat, smooth=False)
+        b.quad(left[-1], right[-1], fr[-1], fl[-1], mat)
+        b.quad(left[0], fl[0], fr[0], right[0], mat)
+
     def build_keel_and_stem(self):
         b = self.body
         # Keel: a deep timber along the bottom.
@@ -869,32 +916,47 @@ class ShipBuilder:
             pts.append(Vector((0, self.bottom_y(t) - 0.12, -self.L / 2 + t * self.L)))
             sc.append((0.5, 1.6))
         b.tube(pts, 0.28, "wale", sides=4, smooth=False, scale_xy=sc)
-        # Stem and cutwater: sweeps forward from the keel to the figurehead.
-        yb = self.bottom_y(0.06)
-        head_y = self.deck_y(0.0) * 0.82
-        p0 = Vector((0, yb, -self.L / 2 + self.L * 0.06))
-        p1 = Vector((0, yb * 0.2, -self.L / 2 - self.L * 0.012))
-        p2 = Vector((0, head_y, -self.L / 2 - self.L * 0.055))
-        stem = []
-        for i in range(13):
-            f = i / 12
-            stem.append(p0.lerp(p1, f).lerp(p1.lerp(p2, f), f))
-        widths = [(0.55, lerp(2.2, 1.2, i / 12)) for i in range(13)]
-        b.tube(stem, 0.3, "wale", sides=4, smooth=False, scale_xy=widths)
-        self.stem_head = p2
-        # Figurehead: a gilt lion leaning out from the stem head.
-        fig = p2 + Vector((0, 0.15, -0.55))
-        b.sphere(fig, 0.30, "trim", segs=8, rings=6, scale=(0.7, 0.8, 1.6))
-        b.sphere(fig + Vector((0, 0.32, -0.4)), 0.21, "trim", segs=8, rings=6)
-        # Head rails from the bow sides to the figurehead.
+        # Stem: a timber running exactly along the hull's bow line, keel to rail.
+        def stem_pt(f):
+            return self.hull_pt(0.0, f, 1)
+
+        def stem_fwd(f):
+            e = 1e-3
+            d = stem_pt(f + e) - stem_pt(max(f - e, 0.0))
+            fwd = Vector((0, d.z, -d.y)).normalized()      # perpendicular, pointing forward
+            return fwd if fwd.z < 0 else -fwd
+
+        top_f = 1.0
+        fs = [lerp(-0.02, top_f, i / 16) for i in range(17)]
+        self.ribbon(fs, stem_pt, stem_fwd, lambda f: 0.3 * (1.0 - 0.6 * smoothstep(0.85, 1.0, f)),
+                    lambda f: 0.18, "wale")
+        # Knee of the head (cutwater): a fin sweeping forward from the
+        # waterline to the figurehead, carrying the beakhead above it.
         if self.castle >= 1 or self.rows >= 1:
+            f_lo = self.f_at(0.0, -0.2)
+            f_hi = self.f_at(0.0, self.deck_y(0.0) * 0.86)
+            reach = self.L * 0.045
+            self.ribbon([lerp(f_lo, f_hi, i / 12) for i in range(13)], stem_pt, stem_fwd,
+                        lambda f: 0.3 + reach * math.sin(math.pi * 0.5 * (f - f_lo) / (f_hi - f_lo)) ** 1.6,
+                        lambda f: 0.14, "wale")
+            head = stem_pt(f_hi) + stem_fwd(f_hi) * (0.3 + reach)
+        else:
+            reach = 0.0
+            head = stem_pt(top_f) + stem_fwd(top_f) * 0.3
+        self.stem_head = head
+        # Figurehead: a gilt lion leaning out from the head of the stem.
+        fig = head + Vector((0, 0.05, -0.12))
+        b.sphere(fig, 0.24, "trim", segs=10, rings=6, scale=(0.7, 0.9, 1.5))
+        b.sphere(fig + Vector((0, 0.28, -0.26)), 0.17, "trim", segs=8, rings=6)
+        # Head rails: curved timbers from the bow to the figurehead.
+        if reach > 0:
             for side in (-1, 1):
-                for k, f in enumerate((0.80, 0.92)):
-                    a = self.hull_pt(0.07, f, side)
-                    c = p2 + Vector((0, -0.25 * k, 0.2))
-                    mid = a.lerp(c, 0.5) + Vector((side * 0.25, 0.35 - 0.2 * k, 0))
-                    rail = [a.lerp(mid, s).lerp(mid.lerp(c, s), s) for s in (0, 0.25, 0.5, 0.75, 1.0)]
-                    b.tube(rail, 0.08, "trim", sides=5)
+                for k, f in enumerate((0.82, 0.95)):
+                    a0 = self.hull_pt(0.05, f, side) + Vector((side * 0.06, 0, 0))
+                    c = head + Vector((side * 0.12, -0.15 + 0.4 * k, 0.35))
+                    mid = a0.lerp(c, 0.5) + Vector((side * 0.3, -0.35, 0))
+                    rail = [a0.lerp(mid, u).lerp(mid.lerp(c, u), u) for u in (0, 0.2, 0.4, 0.6, 0.8, 1.0)]
+                    b.tube(rail, 0.08, "trim" if self.castle >= 2 else "rail", sides=5)
         # Rudder.
         zt = self.hull_pt(1.0, 0.0, 1).z
         ytop = self.y_at(1.0, self.f_at(1.0, 0.8))
@@ -923,7 +985,7 @@ class ShipBuilder:
     def build_gunports(self):
         b = self.body
         n = self.port_count()
-        s = self.L * (0.030 if self.rows < 3 else 0.025)
+        s = self.port_size()
         for row, fr in enumerate(self.gun_row_fracs()):
             for side in (-1, 1):
                 for i in range(n):
@@ -1083,11 +1145,14 @@ class ShipBuilder:
     def build_bow(self):
         b = self.body
         if self.castle >= 1:
-            # Beakhead platform with a grating.
-            t = 0.02
-            y = self.deck_y(t) - 0.35
-            z0 = self.hull_pt(t, 1.0, 1).z
-            b.box((0, y, z0 - self.L * 0.025), (self.half_width(0.06) * 1.2, 0.12, self.L * 0.05), "grating")
+            # Beakhead: a triangular grating from the bow out to the head.
+            y = self.stem_head.y + 0.25
+            pl = self.hull_pt(0.05, self.f_at(0.05, y), -1)
+            pr = self.hull_pt(0.05, self.f_at(0.05, y), 1)
+            tip = Vector((0, y, self.stem_head.z + 0.3))
+            for dy, mat in ((0.0, "grating"), (-0.12, "wale")):
+                o = Vector((0, dy, 0))
+                b.face([b.v(pl + o), b.v(pr + o), b.v(tip + o)], mat)
         # Catheads with anchors.
         for side in (-1, 1):
             t = 0.09
@@ -1625,6 +1690,9 @@ def export(type_id, objs):
 def render_preview(type_id, out_dir, L):
     scene = bpy.context.scene
     show_ao_in_materials(bpy.data.objects["Hull"])
+    for o in bpy.data.objects:
+        if o.name.startswith("Sail_sprit"):
+            o.hide_render = True
     scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = 1280
     scene.render.resolution_y = 720
@@ -1658,6 +1726,7 @@ def render_preview(type_id, out_dir, L):
         "q": (Vector((L * 1.35, L * 1.25, L * 0.38)), Vector((0, 0, L * 0.36))),
         "side": (Vector((L * 2.0, 0, L * 0.16)), Vector((0, 0, L * 0.42))),
         "stern": (Vector((-L * 0.75, -L * 1.0, L * 0.25)), Vector((0, -L * 0.3, L * 0.2))),
+        "bow": (Vector((L * 0.30, L * 0.80, L * 0.07)), Vector((0, L * 0.45, L * 0.05))),
     }
     for key, (pos, target) in shots.items():
         cam.location = pos
@@ -1696,7 +1765,7 @@ def main():
         print(msg)
         if preview:
             os.makedirs(preview, exist_ok=True)
-            render_preview(type_id, preview, MODEL_LENGTH)
+            render_preview(type_id, preview, sb.L)
 
 
 main()

@@ -1,6 +1,6 @@
-## A sailing ship: the hull, rig and sails come from a GLB model built in
+## A sailing ship: the hull, rig and sails come from a glTF model built in
 ## Blender by tools/blender/build_ships.py (one per ship class, all modeled
-## at MODEL_LENGTH and scaled here). This script adds the living parts —
+## at its class's real battle length and scaled here). This script adds the living parts —
 ## deck crew, wake foam, broadside smoke, furling sails and a fluttering
 ## flag in the nation's colors — and exposes the deck measurements that
 ## crew placement and boarding rely on.
@@ -8,8 +8,7 @@ extends Node3D
 
 const Person := preload("res://scripts/person.gd")
 
-## Every model is built at this length (metres) — see build_ships.py.
-const MODEL_LENGTH := 30.0
+const ShipTypes := preload("res://core/ship_types.gd")
 ## Rows of gunports per class: beamier, deeper hulls carry more decks.
 const GUN_ROWS := {
 	"tartane": 0, "lugger": 1, "sloop": 1, "schooner": 1, "barque": 1, "brig": 1,
@@ -52,6 +51,12 @@ func build(p_length: float, p_flag: Color, with_crew := true, p_type := "", p_na
 	_build_wake()
 
 
+## Length (m) the class's model is built at by build_ships.py — the same
+## length the battle scene shows it at.
+static func model_length(p_type: String) -> float:
+	return 18.0 + (8 - int(ShipTypes.TYPES[p_type]["rank"])) * 5.0
+
+
 ## Unknown/legacy callers: infer something sensible from the size.
 func _type_for_length(l: float) -> String:
 	if l < 26.0:
@@ -62,7 +67,7 @@ func _type_for_length(l: float) -> String:
 func _load_model() -> void:
 	var scene: PackedScene = load("res://assets/ships/%s.gltf" % type_id)
 	var model: Node3D = scene.instantiate()
-	model.scale = Vector3.ONE * (length / MODEL_LENGTH)
+	model.scale = Vector3.ONE * (length / model_length(type_id))
 	_root.add_child(model)
 	var flag_mat := _flat_material(flag_color)
 	var sail_mat: Material = null
@@ -110,12 +115,12 @@ func _model_space(node: Node3D, model: Node3D) -> Vector3:
 func _half_width(t: float) -> float:
 	var w: float
 	if t < 0.36:
-		w = 1.0 - pow(1.0 - t / 0.36, 2.4)
+		w = 1.0 - pow(1.0 - t / 0.36, 2.2)
 	elif t < 0.70:
 		w = 1.0
 	else:
 		w = 1.0 - 0.38 * smoothstep(0.70, 1.0, t)
-	return _beam * 0.5 * maxf(w, 0.035)
+	return _beam * 0.5 * maxf(w, 0.0)
 
 
 ## Deck sheer line — rises toward bow and stern.
@@ -278,7 +283,8 @@ func _muzzle_smoke(local_pos: Vector3, side: float) -> void:
 func set_sail_amount(frac: float) -> void:
 	frac = clampf(frac, 0.06, 1.0)
 	for pivot in _sails:
-		pivot.scale = Vector3(1, frac, 1)
+		# Squash the belly too, so a furled sail is a tight roll on its spar.
+		pivot.scale = Vector3(1, frac, frac)
 
 
 ## Gentle bobbing on the waves; the flag flutters.
