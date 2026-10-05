@@ -545,7 +545,7 @@ class ShipBuilder:
     def hull_pt(self, t, f, side):
         z = -self.L / 2 + t * self.L
         z += f * self.L * 0.045 * smoothstep(0.88, 1.0, t)               # raked counter
-        z -= (max(f, 0.0) ** 1.3) * self.L * 0.035 * (1.0 - smoothstep(0.0, 0.22, t))  # flared bow
+        z -= (min(max(f, 0.0), 1.0) ** 1.3) * self.L * 0.035 * (1.0 - smoothstep(0.0, 0.22, t))  # raked stem
         return Vector((side * self.section_x(t, f), self.y_at(t, f), z))
 
     def hull_normal(self, t, f, side):
@@ -933,30 +933,19 @@ class ShipBuilder:
         # Knee of the head (cutwater): a fin sweeping forward from the
         # waterline to the figurehead, carrying the beakhead above it.
         if self.castle >= 1 or self.rows >= 1:
-            f_lo = self.f_at(0.0, -0.2)
-            f_hi = self.f_at(0.0, self.deck_y(0.0) * 0.86)
-            reach = self.L * 0.045
+            f_lo = self.f_at(0.0, 0.0)
+            f_hi = self.f_at(0.0, self.deck_y(0.0) * 0.80)
+            reach = self.L * 0.022
             self.ribbon([lerp(f_lo, f_hi, i / 12) for i in range(13)], stem_pt, stem_fwd,
-                        lambda f: 0.3 + reach * math.sin(math.pi * 0.5 * (f - f_lo) / (f_hi - f_lo)) ** 1.6,
+                        lambda f: 0.3 + reach * math.sin(math.pi * (f - f_lo) / (f_hi - f_lo)) ** 0.7,
                         lambda f: 0.14, "wale")
-            head = stem_pt(f_hi) + stem_fwd(f_hi) * (0.3 + reach)
+            head = stem_pt(f_hi) + stem_fwd(f_hi) * 0.3
         else:
             reach = 0.0
             head = stem_pt(top_f) + stem_fwd(top_f) * 0.3
         self.stem_head = head
-        # Figurehead: a gilt lion leaning out from the head of the stem.
-        fig = head + Vector((0, 0.05, -0.12))
-        b.sphere(fig, 0.24, "trim", segs=10, rings=6, scale=(0.7, 0.9, 1.5))
-        b.sphere(fig + Vector((0, 0.28, -0.26)), 0.17, "trim", segs=8, rings=6)
-        # Head rails: curved timbers from the bow to the figurehead.
-        if reach > 0:
-            for side in (-1, 1):
-                for k, f in enumerate((0.82, 0.95)):
-                    a0 = self.hull_pt(0.05, f, side) + Vector((side * 0.06, 0, 0))
-                    c = head + Vector((side * 0.12, -0.15 + 0.4 * k, 0.35))
-                    mid = a0.lerp(c, 0.5) + Vector((side * 0.3, -0.35, 0))
-                    rail = [a0.lerp(mid, u).lerp(mid.lerp(c, u), u) for u in (0, 0.2, 0.4, 0.6, 0.8, 1.0)]
-                    b.tube(rail, 0.08, "trim" if self.castle >= 2 else "rail", sides=5)
+        # The head stays clean: no figurehead knob or head rails sticking out
+        # ahead of the stem — the bow reads as one sweep from keel to bowsprit.
         # Rudder.
         zt = self.hull_pt(1.0, 0.0, 1).z
         ytop = self.y_at(1.0, self.f_at(1.0, 0.8))
@@ -1144,15 +1133,6 @@ class ShipBuilder:
 
     def build_bow(self):
         b = self.body
-        if self.castle >= 1:
-            # Beakhead: a triangular grating from the bow out to the head.
-            y = self.stem_head.y + 0.25
-            pl = self.hull_pt(0.05, self.f_at(0.05, y), -1)
-            pr = self.hull_pt(0.05, self.f_at(0.05, y), 1)
-            tip = Vector((0, y, self.stem_head.z + 0.3))
-            for dy, mat in ((0.0, "grating"), (-0.12, "wale")):
-                o = Vector((0, dy, 0))
-                b.face([b.v(pl + o), b.v(pr + o), b.v(tip + o)], mat)
         # Catheads with anchors.
         for side in (-1, 1):
             t = 0.09
@@ -1727,6 +1707,7 @@ def render_preview(type_id, out_dir, L):
         "side": (Vector((L * 2.0, 0, L * 0.16)), Vector((0, 0, L * 0.42))),
         "stern": (Vector((-L * 0.75, -L * 1.0, L * 0.25)), Vector((0, -L * 0.3, L * 0.2))),
         "bow": (Vector((L * 0.30, L * 0.80, L * 0.07)), Vector((0, L * 0.45, L * 0.05))),
+        "bowside": (Vector((L * 0.75, L * 0.38, L * 0.05)), Vector((0, L * 0.38, L * 0.06))),
     }
     for key, (pos, target) in shots.items():
         cam.location = pos
