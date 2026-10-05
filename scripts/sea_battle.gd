@@ -64,7 +64,7 @@ func _ready() -> void:
 	var enc: Dictionary = Game.pending_encounter
 	free_sail = enc.is_empty()
 	if free_sail:
-		Music.play_shanty()
+		Music.play_sea()
 	else:
 		Music.play_battle()
 		enemy_nation = enc["nation"]
@@ -209,7 +209,7 @@ func _build_ships() -> void:
 	player_node.set_script(ShipVisualScript)
 	add_child(player_node)
 	player_len = _visual_length(player_ship)
-	player_node.build(player_len, _flag_color(Game.state.character.nation), true, player_ship.type_id)
+	player_node.build(player_len, _flag_color(Game.state.character.nation), true, player_ship.type_id, Game.state.character.nation)
 	player_node.position = Vector3(0, 0, 0)
 	player_ship.heading = 0.0
 	player_ship.sail_setting = 0.5
@@ -226,7 +226,7 @@ func _build_ships() -> void:
 		node.set_script(ShipVisualScript)
 		add_child(node)
 		var elen: float = _visual_length(e["ship"])
-		node.build(elen, _flag_color(enemy_nation), true, e["ship"].type_id)
+		node.build(elen, _flag_color(enemy_nation), true, e["ship"].type_id, enemy_nation)
 		node.position = Vector3(250 + i * 120 - (enemies.size() - 1) * 60, 0, -450 - (i % 2) * 90)
 		e["node"] = node
 		e["len"] = elen
@@ -247,7 +247,7 @@ func _build_company() -> void:
 		var node := Node3D.new()
 		node.set_script(ShipVisualScript)
 		add_child(node)
-		node.build(_visual_length(ship), _flag_color(comp["nation"]), true, ship.type_id)
+		node.build(_visual_length(ship), _flag_color(comp["nation"]), true, ship.type_id, comp["nation"])
 		# A loose column off the starboard beam, on our own course.
 		node.position = Vector3(170 + (i % 2) * 90, 0, -160 - i * 150)
 		node.set_sail_amount(1.0)
@@ -629,7 +629,7 @@ func _sink_visual(node: Node3D) -> void:
 ## Victory: the sea is yours — sail on in open waters, no forced exit.
 func _victory_to_open_waters() -> void:
 	free_sail = true
-	Music.play_shanty()
+	Music.play_sea()
 	Game.save_game()
 	_log("The sea is clear. Sail on — or press Enter for the world map.")
 

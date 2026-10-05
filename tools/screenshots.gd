@@ -66,17 +66,27 @@ func _process(_delta: float) -> bool:
 				sea.cam_dist = 95.0
 		300:
 			_capture("map")
+		305:
+			if current_scene != null and current_scene.name == "OpenSea":
+				current_scene._chart.visible = true
+		312:
+			_capture("chart")
 		320:
 			var game = root.get_node("Game")
-			game.pending_encounter = {"nation": "pirates", "ship_type": "brig", "hostile": true}
+			# Show off the big hulls: a frigate against a Spanish galleon.
+			var frigate = load("res://core/ship.gd").create("frigate")
+			frigate.custom_name = game.state.ship.custom_name
+			frigate.ammo_stock = game.state.ship.ammo_stock.duplicate()
+			game.state.ship = frigate
+			game.pending_encounter = {"nation": "spain", "ship_type": "galleon", "hostile": true}
 			change_scene_to_file("res://scenes/sea.tscn")
 		335:
 			# Full sails and a cinematic three-quarter camera angle.
 			if current_scene != null and current_scene.name == "SeaBattle":
 				current_scene.player_ship.sail_setting = 1.0
-				current_scene.cam_yaw = 132.0
+				current_scene.cam_yaw = 128.0
 				current_scene.cam_pitch = 10.0
-				current_scene.cam_dist = 55.0
+				current_scene.cam_dist = 88.0
 		560:
 			# Stage the shot: enemy up close, hit flashes for drama.
 			if current_scene != null and current_scene.name == "SeaBattle":

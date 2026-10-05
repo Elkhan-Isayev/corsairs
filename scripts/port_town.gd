@@ -92,7 +92,7 @@ var _env_res: Environment
 
 
 func _ready() -> void:
-	Music.play_town(_island()["nation"])
+	Music.play_ambience()
 	_rng.seed = hash(Game.state.current_island)
 	_look = ISLAND_LOOKS.get(Game.state.current_island, ISLAND_LOOKS["oxbay"])
 	_build_environment()
@@ -396,7 +396,7 @@ func _build_quay_and_ship() -> void:
 	add_child(_ship_node)
 	var rank: int = Game.state.ship.spec()["rank"]
 	_ship_len = 18.0 + (8 - rank) * 5.0
-	_ship_node.build(_ship_len, Color(World.NATIONS[Game.state.character.nation]["color"]), true, Game.state.ship.type_id)
+	_ship_node.build(_ship_len, Color(World.NATIONS[Game.state.character.nation]["color"]), true, Game.state.ship.type_id, Game.state.character.nation)
 	_ship_node.position = ANCHOR_POS
 	_ship_node.rotation_degrees = Vector3(0, ANCHOR_ROT_Y, 0)
 	_ship_node.set_sail_amount(0.06)
@@ -972,134 +972,13 @@ func _process_npcs(delta: float) -> void:
 # --- Player ---
 
 func _build_player() -> void:
-	player = Node3D.new()
+	# The captain: a rigged character model, limbs driven through pivots.
+	var p := Person.build(Color("2c3a5c"), Person.SKIN_DEFAULT, false, 1, false, "captain")
+	player = p["root"]
 	add_child(player)
 	player.position = Vector3(0, 0.95, 2)
-
-	# Legs (pivot at the hip, mesh hangs down).
-	for leg in [["l_leg", -0.13], ["r_leg", 0.13]]:
-		var hip := Node3D.new()
-		hip.position = Vector3(leg[1], 0.86, 0)
-		player.add_child(hip)
-		var thigh := MeshInstance3D.new()
-		var tc := CylinderMesh.new()
-		tc.top_radius = 0.09
-		tc.bottom_radius = 0.075
-		tc.height = 0.72
-		thigh.mesh = tc
-		thigh.position = Vector3(0, -0.36, 0)
-		thigh.material_override = _mat(Color("3a3226"))
-		hip.add_child(thigh)
-		var boot := MeshInstance3D.new()
-		var bc := BoxMesh.new()
-		bc.size = Vector3(0.16, 0.14, 0.3)
-		boot.mesh = bc
-		boot.position = Vector3(0, -0.79, -0.05)
-		boot.material_override = _mat(Color("1d1208"))
-		hip.add_child(boot)
-		_limbs[leg[0]] = hip
-
-	# Coat (flared), belt, chest.
-	var coat := MeshInstance3D.new()
-	var cc := CylinderMesh.new()
-	cc.top_radius = 0.23
-	cc.bottom_radius = 0.33
-	cc.height = 0.62
-	coat.mesh = cc
-	coat.position = Vector3(0, 1.17, 0)
-	coat.material_override = _mat(Color("2c3a5c"))
-	player.add_child(coat)
-	var belt := MeshInstance3D.new()
-	var blc := CylinderMesh.new()
-	blc.top_radius = 0.25
-	blc.bottom_radius = 0.25
-	blc.height = 0.09
-	belt.mesh = blc
-	belt.position = Vector3(0, 0.95, 0)
-	belt.material_override = _mat(Color("1d1208"))
-	player.add_child(belt)
-	var chest := MeshInstance3D.new()
-	var chc := BoxMesh.new()
-	chc.size = Vector3(0.34, 0.2, 0.2)
-	chest.mesh = chc
-	chest.position = Vector3(0, 1.52, 0)
-	chest.material_override = _mat(Color("2c3a5c"))
-	player.add_child(chest)
-	# White shirt collar.
-	var collar := MeshInstance3D.new()
-	var coc := BoxMesh.new()
-	coc.size = Vector3(0.16, 0.14, 0.1)
-	collar.mesh = coc
-	collar.position = Vector3(0, 1.56, -0.12)
-	collar.material_override = _mat(Color("f5f1e6"))
-	player.add_child(collar)
-
-	# Arms (pivot at the shoulder).
-	for arm in [["l_arm", -0.30], ["r_arm", 0.30]]:
-		var shoulder := Node3D.new()
-		shoulder.position = Vector3(arm[1], 1.55, 0)
-		player.add_child(shoulder)
-		var sleeve := MeshInstance3D.new()
-		var sc := CapsuleMesh.new()
-		sc.radius = 0.07
-		sc.height = 0.62
-		sleeve.mesh = sc
-		sleeve.position = Vector3(0, -0.26, 0)
-		sleeve.material_override = _mat(Color("2c3a5c"))
-		shoulder.add_child(sleeve)
-		var hand := MeshInstance3D.new()
-		var hc := SphereMesh.new()
-		hc.radius = 0.06
-		hc.height = 0.12
-		hand.mesh = hc
-		hand.position = Vector3(0, -0.58, 0)
-		hand.material_override = _mat(Color("d9a97a"))
-		shoulder.add_child(hand)
-		_limbs[arm[0]] = shoulder
-
-	# Head, hair, nose, tricorn hat.
-	var head := MeshInstance3D.new()
-	var hm := SphereMesh.new()
-	hm.radius = 0.155
-	hm.height = 0.31
-	head.mesh = hm
-	head.position = Vector3(0, 1.78, 0)
-	head.material_override = _mat(Color("d9a97a"))
-	player.add_child(head)
-	var nose := MeshInstance3D.new()
-	var nm := SphereMesh.new()
-	nm.radius = 0.035
-	nm.height = 0.07
-	nose.mesh = nm
-	nose.position = Vector3(0, 1.77, -0.15)
-	nose.material_override = _mat(Color("cf9868"))
-	player.add_child(nose)
-	var hair := MeshInstance3D.new()
-	var hrm := SphereMesh.new()
-	hrm.radius = 0.16
-	hrm.height = 0.28
-	hair.mesh = hrm
-	hair.position = Vector3(0, 1.83, 0.05)
-	hair.material_override = _mat(Color("3a2513"))
-	player.add_child(hair)
-	var brim := MeshInstance3D.new()
-	var brc := CylinderMesh.new()
-	brc.top_radius = 0.27
-	brc.bottom_radius = 0.27
-	brc.height = 0.05
-	brim.mesh = brc
-	brim.position = Vector3(0, 1.93, 0)
-	brim.material_override = _mat(Color("1d1208"))
-	player.add_child(brim)
-	var crown := MeshInstance3D.new()
-	var crc := CylinderMesh.new()
-	crc.top_radius = 0.13
-	crc.bottom_radius = 0.16
-	crc.height = 0.14
-	crown.mesh = crc
-	crown.position = Vector3(0, 2.02, 0)
-	crown.material_override = _mat(Color("1d1208"))
-	player.add_child(crown)
+	for limb in ["l_leg", "r_leg", "l_arm", "r_arm"]:
+		_limbs[limb] = p[limb]
 
 
 var _hud: CanvasLayer

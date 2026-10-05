@@ -46,7 +46,7 @@ var _chart: SeaChart
 
 
 func _ready() -> void:
-	Music.play_shanty()
+	Music.play_sea()
 	_build_environment()
 	_build_ocean()
 	for id in World.island_ids():
@@ -261,7 +261,7 @@ func _build_player_ship() -> void:
 	_ship_node = Node3D.new()
 	_ship_node.set_script(ShipVisualScript)
 	add_child(_ship_node)
-	_ship_node.build(SHIP_LEN, Color(World.NATIONS[Game.state.character.nation]["color"]), false, Game.state.ship.type_id)
+	_ship_node.build(SHIP_LEN, Color(World.NATIONS[Game.state.character.nation]["color"]), false, Game.state.ship.type_id, Game.state.character.nation)
 	_ship_node.set_sail_amount(maxf(Game.state.ship.sail_setting, 0.06))
 	camera = Camera3D.new()
 	camera.far = 4500.0
@@ -330,8 +330,8 @@ func _build_hud() -> void:
 
 	_chart = SeaChart.new()
 	_chart.set_anchors_preset(Control.PRESET_CENTER)
-	_chart.custom_minimum_size = Vector2(640, 512)
-	_chart.position = Vector2(-320, -256)
+	_chart.custom_minimum_size = Vector2(800, 640)
+	_chart.position = Vector2(-400, -320)
 	_chart.visible = false
 	hud.add_child(_chart)
 
@@ -429,7 +429,7 @@ func _spawn_sail(dist: float) -> void:
 	var node := Node3D.new()
 	node.set_script(ShipVisualScript)
 	add_child(node)
-	node.build(NPC_LEN, Color(World.NATIONS[enc["nation"]]["color"]), false, enc["ship_type"])
+	node.build(NPC_LEN, Color(World.NATIONS[enc["nation"]]["color"]), false, enc["ship_type"], enc["nation"])
 	node.position = pos
 	node.set_sail_amount(1.0)
 	_npcs.append({
@@ -558,22 +558,31 @@ class SeaChart:
 
 	var player_pos := Vector2.ZERO
 	var player_heading := 0.0
+	var _parchment: Texture2D = load("res://assets/art/sea_chart.jpg")
 
 	func _draw() -> void:
 		var sz := get_size()
-		draw_rect(Rect2(Vector2.ZERO, sz), Color(0.13, 0.11, 0.08, 0.9))
-		draw_rect(Rect2(Vector2(6, 6), sz - Vector2(12, 12)), Color(0.85, 0.76, 0.56, 0.97))
-		draw_rect(Rect2(Vector2(14, 14), sz - Vector2(28, 28)), Color(0.62, 0.72, 0.72, 0.55))
+		draw_texture_rect(_parchment, Rect2(Vector2.ZERO, sz), false)
 		var font := get_theme_default_font()
-		draw_string(font, Vector2(24, 34), "Sea chart  (M to close)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.25, 0.18, 0.08))
+		var ink := Color(0.24, 0.15, 0.07)
+		draw_string(font, Vector2(0, sz.y - 30), "Sea chart  (M to close)",
+			HORIZONTAL_ALIGNMENT_CENTER, sz.x, 15, ink)
 		for id in World.island_ids():
 			var isl: Dictionary = World.island(id)
 			var p := _to_chart(Vector2(isl["pos"][0], isl["pos"][1]), sz)
-			draw_circle(p, 9.0, Color(0.55, 0.52, 0.36))
-			draw_circle(p, 6.0, Color(World.NATIONS[isl["nation"]]["color"]))
-			draw_string(font, p + Vector2(12, 5), isl["name"],
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.2, 0.14, 0.06))
+			# An inked island: a wobbly coastline around a sandy fill.
+			var coast := PackedVector2Array()
+			var seed_k := float(id.hash() % 97)
+			for i in 14:
+				var a := TAU * i / 14.0
+				var r := 13.0 + 4.0 * sin(a * 3.0 + seed_k) + 2.5 * cos(a * 5.0 + seed_k * 0.7)
+				coast.append(p + Vector2(cos(a) * r * 1.4, sin(a) * r))
+			draw_colored_polygon(coast, Color(0.78, 0.66, 0.42, 0.9))
+			coast.append(coast[0])
+			draw_polyline(coast, ink, 1.5, true)
+			draw_circle(p, 4.0, Color(World.NATIONS[isl["nation"]]["color"]))
+			draw_string(font, p + Vector2(22, 5), isl["name"],
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
 		# The player: a heading arrow.
 		var pp := _to_chart(player_pos, sz)
 		var h := deg_to_rad(player_heading)
@@ -584,7 +593,8 @@ class SeaChart:
 		]), Color(0.75, 0.12, 0.1))
 
 	func _to_chart(chart_pos: Vector2, sz: Vector2) -> Vector2:
-		var inner := Rect2(Vector2(24, 44), sz - Vector2(48, 68))
+		# Keep clear of the parchment's engraved border.
+		var inner := Rect2(sz * Vector2(0.10, 0.10), sz * Vector2(0.78, 0.76))
 		return inner.position + Vector2(
 			chart_pos.x / 1000.0 * inner.size.x,
 			chart_pos.y / 800.0 * inner.size.y)

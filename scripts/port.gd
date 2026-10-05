@@ -18,6 +18,17 @@ func _ready() -> void:
 	bg.color = Color("1b2a38")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+	# Painted harbor behind the panels.
+	var art := TextureRect.new()
+	art.texture = load("res://assets/art/port_harbor.jpg")
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(art)
+	var shade := ColorRect.new()
+	shade.color = Color(0.04, 0.07, 0.11, 0.35)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -45,6 +56,11 @@ func _ready() -> void:
 
 	_tabs = TabContainer.new()
 	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color(0.06, 0.1, 0.15, 0.86)
+	panel.set_corner_radius_all(6)
+	panel.set_content_margin_all(14)
+	_tabs.add_theme_stylebox_override("panel", panel)
 	root.add_child(_tabs)
 
 	_generate_quest_offers()
@@ -79,10 +95,10 @@ func _rebuild() -> void:
 	for c in _tabs.get_children():
 		_tabs.remove_child(c)
 		c.queue_free()
-	_tabs.add_child(_build_port_tab())
-	_tabs.add_child(_build_market_tab())
-	_tabs.add_child(_build_shipyard_tab())
-	_tabs.add_child(_build_captain_tab())
+	_tabs.add_child(_with_portrait(_build_port_tab(), "governor", "The Governor"))
+	_tabs.add_child(_with_portrait(_build_market_tab(), "merchant", "The Merchant"))
+	_tabs.add_child(_with_portrait(_build_shipyard_tab(), "shipwright", "The Shipwright"))
+	_tabs.add_child(_with_portrait(_build_captain_tab(), "captain", "Captain " + s.character.char_name))
 	for i in 4:
 		_tabs.set_tab_title(i, ["Port", "Market", "Shipyard", "Captain"][i])
 	if Game.port_tab >= 0:
@@ -90,6 +106,35 @@ func _rebuild() -> void:
 		Game.port_tab = -1
 	elif current_tab >= 0 and current_tab < 4:
 		_tabs.current_tab = maxi(current_tab, 0)
+
+
+## The tab's content with a painted portrait of whoever you deal with there.
+func _with_portrait(content: Control, who: String, caption: String) -> Control:
+	var row := HBoxContainer.new()
+	row.name = content.name
+	row.add_theme_constant_override("separation", 18)
+	var col := VBoxContainer.new()
+	row.add_child(col)
+	var frame := PanelContainer.new()
+	var border := StyleBoxFlat.new()
+	border.bg_color = Color(0.1, 0.07, 0.04)
+	border.border_color = Color("c9a54f")
+	border.set_border_width_all(3)
+	border.set_content_margin_all(3)
+	frame.add_theme_stylebox_override("panel", border)
+	col.add_child(frame)
+	var pic := TextureRect.new()
+	pic.texture = load("res://assets/art/portrait_%s.jpg" % who)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pic.custom_minimum_size = Vector2(210, 210)
+	frame.add_child(pic)
+	var name_lbl := _label(caption, "e8c872")
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(name_lbl)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(content)
+	return row
 
 
 func _scroll_tab(title: String) -> ScrollContainer:

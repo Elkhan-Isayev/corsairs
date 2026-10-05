@@ -1,4 +1,6 @@
 ## "Music" autoload: looping background tracks with a soft crossfade.
+## The score was composed with Suno (assets/music/*.mp3); towns have no
+## music — only the ambient surf of the harbor (waves.wav).
 extends Node
 
 var _player_a: AudioStreamPlayer
@@ -20,34 +22,35 @@ func _make_player() -> AudioStreamPlayer:
 	return p
 
 
-func _load_loop(path: String) -> AudioStreamWAV:
-	var stream: AudioStreamWAV = load(path)
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_begin = 0
-	stream.loop_end = stream.data.size() / 2  # 16-bit mono frames
+func _load_loop(path: String) -> AudioStream:
+	var stream: AudioStream = load(path)
+	if stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		wav.loop_end = wav.data.size() / 2  # 16-bit mono frames
+	elif stream is AudioStreamMP3:
+		(stream as AudioStreamMP3).loop = true
 	return stream
 
 
+## Main menu and the port screens.
 func play_theme() -> void:
-	_play("res://assets/music/theme.wav", -9.0)
+	_play("res://assets/music/theme.mp3", -8.0)
 
 
 func play_battle() -> void:
-	_play("res://assets/music/battle.wav", -8.0)
+	_play("res://assets/music/battle.mp3", -8.0)
 
 
-## The jaunty sailing tune for the open sea and free sailing.
-func play_shanty() -> void:
-	_play("res://assets/music/shanty.wav", -9.0)
+## Sailing the open sea and free sailing after a battle.
+func play_sea() -> void:
+	_play("res://assets/music/sea.mp3", -9.0)
 
 
-## Every nation's towns have their own tune.
-func play_town(nation: String) -> void:
-	var path := "res://assets/music/town_%s.wav" % nation
-	if not ResourceLoader.exists(path):
-		play_theme()
-		return
-	_play(path, -9.0)
+## Towns: no music, just the surf and the harbor.
+func play_ambience() -> void:
+	_play("res://assets/music/waves.wav", -12.0)
 
 
 func _play(path: String, target_db: float) -> void:

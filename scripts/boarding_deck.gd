@@ -118,7 +118,7 @@ func _build_ships() -> void:
 	enemy_deck = Node3D.new()
 	enemy_deck.set_script(ShipVisualScript)
 	add_child(enemy_deck)
-	enemy_deck.build(deck_len, Color(World.NATIONS[enemy_nation]["color"]), false, enemy_ship.type_id)
+	enemy_deck.build(deck_len, Color(World.NATIONS[enemy_nation]["color"]), false, enemy_ship.type_id, enemy_nation)
 	enemy_deck.set_sail_amount(0.06)
 	deck_halfw = enemy_deck._beam * 0.5 * 0.92
 
@@ -127,7 +127,7 @@ func _build_ships() -> void:
 	var own := Node3D.new()
 	own.set_script(ShipVisualScript)
 	add_child(own)
-	own.build(own_len, Color(World.NATIONS[Game.state.character.nation]["color"]), false, player_ship.type_id)
+	own.build(own_len, Color(World.NATIONS[Game.state.character.nation]["color"]), false, player_ship.type_id, Game.state.character.nation)
 	own.set_sail_amount(0.06)
 	own.position = Vector3(-(deck_len + own_len) * 0.16, 0, deck_len * 0.05)
 
