@@ -140,6 +140,7 @@ func _build_environment() -> void:
 	env.environment = e
 	add_child(env)
 	_env_res = e
+	DayCycle.upgrade(_env_res, SEA_LOOK)
 	DayCycle.apply(_sun, _env_res, Game.time_of_day, SEA_LOOK)
 
 	var water := MeshInstance3D.new()
@@ -256,7 +257,7 @@ func _build_company() -> void:
 
 
 func _visual_length(ship: RefCounted) -> float:
-	return 18.0 + (8 - int(ship.spec()["rank"])) * 5.0
+	return ShipVisualScript.class_length(ship.type_id)
 
 
 func _build_hud() -> void:

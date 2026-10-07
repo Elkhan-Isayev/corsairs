@@ -4,6 +4,35 @@
 ## while the light wheels overhead.
 extends RefCounted
 
+const SKY_CLEAR := "res://assets/sky/kloofendal_48d_partly_cloudy_puresky.hdr"
+const SKY_OVERCAST := "res://assets/sky/kloofendal_overcast_puresky.hdr"
+
+
+## Photographic sky (Poly Haven HDRI) by day, the procedural sky at night,
+## plus the desktop-renderer extras: SSAO, sky-lit ambient and reflections.
+## Call once right after a scene builds its Environment.
+static func upgrade(env: Environment, look: Dictionary = {}) -> void:
+	var night := env.sky.sky_material
+	var pano := PanoramaSkyMaterial.new()
+	pano.panorama = load(SKY_OVERCAST if float(look.get("overcast", 0.0)) > 0.4 else SKY_CLEAR)
+	env.set_meta("night_sky", night)
+	env.set_meta("day_sky", pano)
+	env.fog_sky_affect = 0.12
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.0
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 1.6
+	env.ssil_enabled = true
+	env.glow_enabled = true
+	env.glow_intensity = 0.35
+	env.glow_bloom = 0.04
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.06
+	env.adjustment_contrast = 1.05
+
 
 static func apply(sun: DirectionalLight3D, env: Environment, hour: float, look: Dictionary = {}) -> void:
 	if sun == null or env == null:
@@ -26,6 +55,16 @@ static func apply(sun: DirectionalLight3D, env: Environment, hour: float, look: 
 		sun.light_color = Color(0.62, 0.72, 0.95)
 		sun.light_energy = 0.14
 
+	# By day the photographed sky, brightening with the sun.
+	if env.has_meta("day_sky"):
+		var pano: PanoramaSkyMaterial = env.get_meta("day_sky")
+		if day_k > 0.12:
+			env.sky.sky_material = pano
+			pano.energy_multiplier = lerpf(0.35, 1.0, day_k) * (1.0 - overcast * 0.2)
+			env.fog_light_color = Color(look.get("fog_color", "dcc9a6")).lerp(Color("b8c8d8"), 0.5)
+			env.fog_density = float(look.get("fog", 0.0012)) * 0.6
+			return
+		env.sky.sky_material = env.get_meta("night_sky")
 	var sky_mat := env.sky.sky_material as ProceduralSkyMaterial
 	if sky_mat == null:
 		return

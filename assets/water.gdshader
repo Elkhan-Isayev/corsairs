@@ -2,8 +2,8 @@ shader_type spatial;
 render_mode cull_disabled, specular_schlick_ggx;
 
 uniform sampler2D noise_tex;
-uniform vec3 deep_color : source_color = vec3(0.008, 0.09, 0.16);
-uniform vec3 shallow_color : source_color = vec3(0.05, 0.32, 0.42);
+uniform vec3 deep_color : source_color = vec3(0.004, 0.05, 0.10);
+uniform vec3 shallow_color : source_color = vec3(0.02, 0.20, 0.30);
 uniform vec3 foam_color : source_color = vec3(0.92, 0.96, 1.0);
 
 varying vec3 world_pos;
@@ -32,7 +32,7 @@ void fragment() {
 	// Two scrolling noise samples fake small ripple normals.
 	float n1 = texture(noise_tex, p * 0.020 + vec2(TIME * 0.021, TIME * 0.014)).r;
 	float n2 = texture(noise_tex, p * 0.043 - vec2(TIME * 0.016, TIME * 0.024)).r;
-	vec3 nm_world = normalize(vec3((n1 - 0.5) * 0.55, 1.0, (n2 - 0.5) * 0.55));
+	vec3 nm_world = normalize(vec3((n1 - 0.5) * 0.32, 1.0, (n2 - 0.5) * 0.32));
 	NORMAL = normalize((VIEW_MATRIX * vec4(nm_world, 0.0)).xyz);
 
 	float depth_mix = clamp(wave_h * 0.30 + 0.45, 0.0, 1.0);
@@ -41,7 +41,10 @@ void fragment() {
 	float foam = smoothstep(1.25, 1.75, wave_h + (n2 - 0.5) * 0.5);
 	col = mix(col, foam_color, foam * 0.4);
 
+	// A photographic sky is bright: keep the sea a deep blue and let only
+	// grazing angles pick up the sky (Fresnel), like real open water.
+	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 5.0);
 	ALBEDO = col;
-	ROUGHNESS = mix(0.04, 0.30, foam);
-	SPECULAR = 0.75;
+	ROUGHNESS = mix(0.16, 0.38, foam);
+	SPECULAR = mix(0.22, 0.6, fres);
 }

@@ -92,6 +92,7 @@ func _build_environment() -> void:
 	add_child(env)
 	env.environment = e
 	_env_res = e
+	DayCycle.upgrade(_env_res, OPEN_LOOK)
 	DayCycle.apply(_sun, _env_res, Game.time_of_day, OPEN_LOOK)
 
 

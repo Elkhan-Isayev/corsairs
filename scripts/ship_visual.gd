@@ -1,24 +1,33 @@
-## A sailing ship: the hull, rig and sails come from a glTF model built in
-## Blender by tools/blender/build_ships.py (one per ship class, all modeled
-## at its class's real battle length and scaled here). This script adds the living parts —
-## deck crew, wake foam, broadside smoke, furling sails and a fluttering
-## flag in the nation's colors — and exposes the deck measurements that
-## crew placement and boarding rely on.
+## A sailing ship: hull, rig and sails are Poly Haven's CC0 period ship
+## models (prepared by tools/blender/import_ships.py), one per size band and
+## scaled to the class. This script adds the living parts — deck crew, wake
+## foam, broadside smoke, furling sails, sails and flags in the nation's
+## colors — and exposes the deck measurements crew and boarders rely on.
 extends Node3D
 
 const Person := preload("res://scripts/person.gd")
-
 const ShipTypes := preload("res://core/ship_types.gd")
-## Rows of gunports per class: beamier, deeper hulls carry more decks.
-const GUN_ROWS := {
-	"tartane": 0, "lugger": 1, "sloop": 1, "schooner": 1, "barque": 1, "brig": 1,
-	"galleon": 2, "corvette": 1, "frigate": 2, "battleship": 2, "manowar": 3,
+
+## Which model carries each class.
+const MODEL := {
+	"tartane": "dutch_ship_medium", "lugger": "dutch_ship_medium",
+	"sloop": "dutch_ship_medium", "schooner": "dutch_ship_medium",
+	"barque": "dutch_ship_large_02", "brig": "dutch_ship_large_02",
+	"corvette": "dutch_ship_large_02",
+	"galleon": "dutch_ship_large_01", "frigate": "dutch_ship_large_01",
+	"battleship": "ship_pinnace", "manowar": "ship_pinnace",
+}
+## Sailcloth tint per nation (multiplies the weathered canvas texture).
+const SAIL_TINT := {
+	"england": Color(1, 0.98, 0.94), "france": Color(0.42, 0.5, 0.78),
+	"spain": Color(1, 0.96, 0.88), "holland": Color(1, 0.9, 0.78),
+	"pirates": Color(0.36, 0.33, 0.31),
 }
 
 var length := 30.0
 var flag_color := Color("c62828")
 var type_id := ""
-## Nation id ("england", "france", ...): picks sailcloth, heraldry and flag.
+## Nation id ("england", "france", ...): picks sail tint and ensign.
 var nation := ""
 
 var _sails: Array = []   # sail nodes scaled along local Y to furl/unfurl
@@ -28,33 +37,32 @@ var _wake: MeshInstance3D
 var _wake_mat: StandardMaterial3D
 var _root: Node3D
 var _beam: float
-var _depth: float
-var _gun_rows := 1
+var _scale := 1.0
+var _deck_samples: Array = []
+var _half_samples: Array = []
 ## Muzzle positions per side (-1 port, 1 starboard) for volley smoke.
 var _gun_ports := {-1: [], 1: []}
+
+static var _profiles := {}
 
 
 func build(p_length: float, p_flag: Color, with_crew := true, p_type := "", p_nation := "") -> void:
 	length = p_length
 	flag_color = p_flag
 	nation = p_nation
-	type_id = p_type if GUN_ROWS.has(p_type) else _type_for_length(p_length)
-	_gun_rows = GUN_ROWS[type_id]
+	type_id = p_type if MODEL.has(p_type) else _type_for_length(p_length)
 	_root = Node3D.new()
 	add_child(_root)
-	# Heavier classes are beamier and deeper: a man-of-war is a wall of oak.
-	_beam = length * (0.26 + 0.014 * _gun_rows)
-	_depth = length * (0.115 + 0.020 * maxi(_gun_rows - 1, 0))
 	_load_model()
 	if with_crew:
 		_build_crew()
 	_build_wake()
 
 
-## Length (m) the class's model is built at by build_ships.py — the same
-## length the battle scene shows it at.
-static func model_length(p_type: String) -> float:
-	return 18.0 + (8 - int(ShipTypes.TYPES[p_type]["rank"])) * 5.0
+## The length (m) a class is shown at in battle, harbor and boarding.
+static func class_length(p_type: String) -> float:
+	var rank := int(ShipTypes.TYPES[p_type]["rank"]) if ShipTypes.TYPES.has(p_type) else 5
+	return 20.0 + (8 - rank) * 3.0
 
 
 ## Unknown/legacy callers: infer something sensible from the size.
@@ -64,68 +72,80 @@ func _type_for_length(l: float) -> String:
 	return "brig" if l < 34.0 else "frigate"
 
 
+static func _profile(model_id: String) -> Dictionary:
+	if not _profiles.has(model_id):
+		var f := FileAccess.open("res://assets/ships/%s.json" % model_id, FileAccess.READ)
+		_profiles[model_id] = JSON.parse_string(f.get_as_text())
+	return _profiles[model_id]
+
+
 func _load_model() -> void:
-	var scene: PackedScene = load("res://assets/ships/%s.gltf" % type_id)
-	var model: Node3D = scene.instantiate()
-	model.scale = Vector3.ONE * (length / model_length(type_id))
+	var model_id: String = MODEL[type_id]
+	var prof := _profile(model_id)
+	_scale = length / float(prof["length"])
+	_deck_samples = prof["deck"]
+	_half_samples = prof["half"]
+	var widest := 0.0
+	for w in _half_samples:
+		widest = maxf(widest, float(w))
+	_beam = widest * 2.0 * _scale
+
+	var model: Node3D = load("res://assets/ships/%s.gltf" % model_id).instantiate()
+	model.scale = Vector3.ONE * _scale
 	_root.add_child(model)
 	var flag_mat := _flat_material(flag_color)
-	var sail_mat: Material = null
-	var emblem_mat: Material = null
-	var dir := "res://assets/ships/nations/"
-	if nation != "" and ResourceLoader.exists(dir + nation + "_sail.jpg"):
-		sail_mat = _cloth_material(load(dir + nation + "_sail.jpg"))
-		emblem_mat = _cloth_material(load(dir + nation + "_sail_emblem.jpg"))
-		flag_mat = _cloth_material(load(dir + nation + "_flag.jpg"))
-	for node in model.find_children("*", "Node3D", true, false):
-		var n := String(node.name)
-		if n == "Hull":
-			# Ambient occlusion is baked into the hull's vertex colors.
-			var mesh: Mesh = (node as MeshInstance3D).mesh
-			for i in mesh.get_surface_count():
-				var m := mesh.surface_get_material(i) as BaseMaterial3D
-				if m != null:
-					m.vertex_color_use_as_albedo = true
-		elif n.begins_with("Sail"):
-			_sails.append(node)
-			# Sails ending in "_E" carry the nation's coat of arms.
-			if sail_mat != null:
-				(node as MeshInstance3D).material_override = emblem_mat if n.ends_with("_E") else sail_mat
+	var flag_path := "res://assets/ships/nations/%s_flag.jpg" % nation
+	if nation != "" and ResourceLoader.exists(flag_path):
+		flag_mat = _cloth_material(load(flag_path))
+	var tint: Color = SAIL_TINT.get(nation, Color.WHITE)
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		var n := String(mi.name)
+		if n.begins_with("Sail"):
+			_sails.append(mi)
+			var src := mi.mesh.surface_get_material(0) as BaseMaterial3D
+			if src != null:
+				var m: BaseMaterial3D = src.duplicate()
+				m.albedo_color = tint
+				m.cull_mode = BaseMaterial3D.CULL_DISABLED
+				# Canvas lets the sun through: sails glow instead of going black
+				# when the light is behind them.
+				m.backlight_enabled = true
+				m.backlight = tint.darkened(0.25)
+				mi.material_override = m
 		elif n.begins_with("Flag") or n.begins_with("Pennant"):
-			(node as MeshInstance3D).material_override = flag_mat
-			_flags.append(node)
-		elif n.begins_with("Muzzle"):
-			var p := _model_space(node, model)
-			_gun_ports[1 if p.x > 0.0 else -1].append(p)
+			mi.material_override = flag_mat
+			_flags.append(mi)
+	_place_guns()
 
 
-## Position of `node` in _root space (the model is scaled inside _root).
-func _model_space(node: Node3D, model: Node3D) -> Vector3:
-	var xf := Transform3D.IDENTITY
-	var n: Node = node
-	while n != model:
-		xf = (n as Node3D).transform * xf
-		n = n.get_parent()
-	return (model.transform * xf).origin
+## Broadside smoke comes from a row of ports along each side.
+func _place_guns() -> void:
+	var n := clampi(int(length / 3.5), 4, 14)
+	for side in [-1, 1]:
+		for i in n:
+			var t := 0.2 + (float(i) + 0.5) / n * 0.6
+			var z := -length / 2.0 + t * length
+			var y := maxf(_deck_y(t) - 1.0 * _scale, 0.8)
+			_gun_ports[side].append(Vector3(side * (_half_width(t) + 0.6), y, z))
 
 
-# --- Deck measurements (keep in sync with build_ships.py) ---
+# --- Deck measurements, sampled from the model ---
 
-## Half-width along the hull, t: 0 = bow, 1 = stern.
+func _sample(arr: Array, t: float) -> float:
+	var f := clampf(t, 0.0, 1.0) * (arr.size() - 1)
+	var i := mini(int(f), arr.size() - 2)
+	return lerpf(float(arr[i]), float(arr[i + 1]), f - i) * _scale
+
+
+## Half-width of the hull at deck level, t: 0 = bow, 1 = stern.
 func _half_width(t: float) -> float:
-	var w: float
-	if t < 0.36:
-		w = 1.0 - pow(1.0 - t / 0.36, 2.2)
-	elif t < 0.70:
-		w = 1.0
-	else:
-		w = 1.0 - 0.38 * smoothstep(0.70, 1.0, t)
-	return _beam * 0.5 * maxf(w, 0.0)
+	return _sample(_half_samples, t)
 
 
-## Deck sheer line — rises toward bow and stern.
+## Height of the deck you'd stand on, t: 0 = bow, 1 = stern.
 func _deck_y(t: float) -> float:
-	return _depth * (0.70 + 0.5 * pow(absf(t - 0.42) / 0.58, 1.8))
+	return _sample(_deck_samples, t)
 
 
 ## Sailors wandering the deck (animated in _process).

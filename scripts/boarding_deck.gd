@@ -7,6 +7,7 @@ const World := preload("res://core/world.gd")
 const Boarding := preload("res://core/boarding.gd")
 const Person := preload("res://scripts/person.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
+const DayCycle := preload("res://scripts/day_cycle.gd")
 
 const MOVE_SPEED := 6.5
 const ATTACK_RANGE := 2.1
@@ -81,6 +82,8 @@ func _build_environment() -> void:
 	e.glow_intensity = 0.45
 	env.environment = e
 	add_child(env)
+	DayCycle.upgrade(e)
+	DayCycle.apply(sun, e, 13.0)
 
 	var water := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
@@ -110,7 +113,7 @@ func _build_environment() -> void:
 
 
 func _vis_len(ship: RefCounted) -> float:
-	return 18.0 + (8 - int(ship.spec()["rank"])) * 5.0
+	return ShipVisualScript.class_length(ship.type_id)
 
 
 func _build_ships() -> void:

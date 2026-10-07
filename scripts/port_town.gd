@@ -9,6 +9,7 @@ const Sailing := preload("res://core/sailing.gd")
 const ShipVisualScript := preload("res://scripts/ship_visual.gd")
 const Person := preload("res://scripts/person.gd")
 const DayCycle := preload("res://scripts/day_cycle.gd")
+const PBR := preload("res://scripts/pbr.gd")
 
 const WALK_SPEED := 9.0
 const SAIL_SPEED_SCALE := 2.6
@@ -49,6 +50,7 @@ var _walk_phase := 0.0
 var _moving := false
 
 const TIMBER := Color("3a2d1c")
+var _house_sizes := {}
 const WALL_COLORS := [Color("efe6d2"), Color("e6d3a8"), Color("d9b8a0"), Color("c9dcd4"), Color("e0c6c0")]
 const ROOF_COLORS := [Color("9a4a2e"), Color("7d3b26"), Color("5d4024")]
 
@@ -148,6 +150,7 @@ func _build_environment() -> void:
 	env.environment = e
 	add_child(env)
 	_env_res = e
+	DayCycle.upgrade(_env_res, _look)
 	DayCycle.apply(_sun, _env_res, Game.time_of_day, _look)
 
 	if bool(_look["rain"]):
@@ -194,12 +197,7 @@ func _build_terrain() -> void:
 	gm.size = Vector2(500, 360)
 	ground.mesh = gm
 	ground.position = Vector3(0, 0, 186)
-	var gmat := StandardMaterial3D.new()
-	gmat.albedo_color = Color(_look["grass"])
-	gmat.albedo_texture = _noise_tex(0.05, Color(0.85, 0.85, 0.78))
-	gmat.uv1_triplanar = true
-	gmat.uv1_scale = Vector3(0.5, 0.5, 0.5)
-	ground.material_override = gmat
+	ground.material_override = PBR.mat("grass_ground", 5.0, Color(_look["grass"]).lerp(Color.WHITE, 0.6))
 	add_child(ground)
 
 	# A sandy shoreline strip between the quay and the grass.
@@ -208,11 +206,7 @@ func _build_terrain() -> void:
 	sm.size = Vector2(500, 10)
 	sand.mesh = sm
 	sand.position = Vector3(0, 0.02, 5)
-	var smat := StandardMaterial3D.new()
-	smat.albedo_color = Color(_look["sand"])
-	smat.albedo_texture = _noise_tex(0.15, Color(0.88, 0.85, 0.8))
-	smat.uv1_triplanar = true
-	sand.material_override = smat
+	sand.material_override = PBR.mat("coast_sand_01", 3.0, Color(_look["sand"]).lerp(Color.WHITE, 0.5))
 	add_child(sand)
 
 	# Streets: each layout paves its own plan.
@@ -222,12 +216,7 @@ func _build_terrain() -> void:
 		stm.size = cobble["size"]
 		street.mesh = stm
 		street.position = cobble["pos"]
-		var stmat := StandardMaterial3D.new()
-		stmat.albedo_color = Color("7d7466")
-		stmat.albedo_texture = _noise_tex(0.4, Color(0.75, 0.73, 0.7))
-		stmat.uv1_triplanar = true
-		stmat.uv1_scale = Vector3(2, 2, 2)
-		street.material_override = stmat
+		street.material_override = PBR.mat("cobblestone_floor_05", 2.5)
 		add_child(street)
 
 	# Bay water with the same animated shader as at sea.
@@ -263,9 +252,7 @@ func _build_terrain() -> void:
 		# Keep the near slope behind the town: no hill may reach past z = 90.
 		var hill_z: float = _rng.randf_range(90.0 + hm.radius, 200.0 + hm.radius)
 		hill.position = Vector3(_rng.randf_range(-220, 220), -8, hill_z)
-		var hmat := StandardMaterial3D.new()
-		hmat.albedo_color = Color(_look["hill"]).lerp(Color(_look["hill"]).lightened(0.18), _rng.randf())
-		hill.material_override = hmat
+		hill.material_override = PBR.mat("rocky_terrain_02", 18.0, Color(_look["hill"]).lerp(Color.WHITE, 0.6))
 		add_child(hill)
 
 	# The Dutch town gets its canal down the middle.
@@ -311,28 +298,31 @@ func _noise_tex(freq: float, dark: Color) -> NoiseTexture2D:
 	return ntex
 
 
+## A coconut palm (Blender-built, Higgsfield fronds) at a random lean.
 func _palm(pos: Vector3) -> void:
-	var trunk := MeshInstance3D.new()
-	var tm := CylinderMesh.new()
-	tm.top_radius = 0.15
-	tm.bottom_radius = 0.3
-	tm.height = 6.0
-	trunk.mesh = tm
-	trunk.position = pos + Vector3(0, 3, 0)
-	trunk.rotation_degrees = Vector3(_rng.randf_range(-8, 8), 0, _rng.randf_range(-8, 8))
-	trunk.material_override = _mat(Color("6b4a2b"))
-	add_child(trunk)
-	for i in 5:
-		var leaf := MeshInstance3D.new()
-		var lm := SphereMesh.new()
-		lm.radius = 1.6
-		lm.height = 0.5
-		leaf.mesh = lm
-		var ang := TAU * i / 5.0
-		leaf.position = pos + Vector3(cos(ang) * 1.2, 6.1, sin(ang) * 1.2)
-		leaf.rotation_degrees = Vector3(8, 0, 0)
-		leaf.material_override = _mat(Color("3f6b2f"))
-		add_child(leaf)
+	var palm: Node3D = load("res://assets/props/palm_0%d.gltf" % _rng.randi_range(1, 3)).instantiate()
+	palm.position = pos
+	palm.rotation.y = _rng.randf() * TAU
+	palm.scale = Vector3.ONE * _rng.randf_range(0.85, 1.2)
+	add_child(palm)
+	for mi: MeshInstance3D in palm.find_children("*", "MeshInstance3D", true, false):
+		var src := mi.mesh.surface_get_material(0) as BaseMaterial3D
+		if src != null and mi.name.begins_with("Fronds"):
+			var m: BaseMaterial3D = src.duplicate()
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+			m.alpha_scissor_threshold = 0.4
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			mi.material_override = m
+
+
+## A Poly Haven prop model, placed on the ground and turned.
+func _prop(id: String, pos: Vector3, yaw := 0.0, scale := 1.0) -> Node3D:
+	var n: Node3D = load("res://assets/props/%s.gltf" % id).instantiate()
+	n.position = pos
+	n.rotation.y = yaw
+	n.scale = Vector3.ONE * scale
+	add_child(n)
+	return n
 
 
 func _mat(c: Color, emissive := false) -> StandardMaterial3D:
@@ -374,28 +364,35 @@ func _mesh_cyl(r_top: float, r_bot: float, h: float, pos: Vector3, c: Color, emi
 
 func _build_quay_and_ship() -> void:
 	var quay := _mesh_box(Vector3(140, 3.0, 10), Vector3(0, -0.6, -5), Color("948a76"))
-	quay.material_override.albedo_texture = _noise_tex(0.3, Color(0.7, 0.68, 0.64))
-	quay.material_override.uv1_triplanar = true
+	quay.material_override = PBR.mat("seaworn_stone_tiles", 2.5)
 
 	# Mooring posts along the edge.
 	for i in 8:
-		_mesh_cyl(0.22, 0.25, 1.4, Vector3(-56 + i * 16, 1.4, -9.2), Color("3a2d1c"))
+		var post := _mesh_cyl(0.22, 0.25, 1.4, Vector3(-56 + i * 16, 1.4, -9.2), TIMBER)
+		post.material_override = PBR.mat("dark_wooden_planks", 1.0)
 
-	# Props: barrels and crates on the quay.
-	for i in 10:
+	# Cargo on the quay: barrels and sea chests, in little stacks.
+	for i in 12:
 		var x := _rng.randf_range(-55, 55)
-		if _rng.randf() < 0.5:
-			_mesh_cyl(0.5, 0.55, 1.2, Vector3(x, 1.5, _rng.randf_range(-7, -3)), Color("5d4024"))
+		var z := _rng.randf_range(-7, -3)
+		if absf(x) < 4.0 or absf(x - 14.0) < 3.0:
+			continue  # keep the departure and boarding spots clear
+		if _rng.randf() < 0.55:
+			for k in _rng.randi_range(1, 3):
+				_prop("wine_barrel_01", Vector3(x + k * 0.8, 0.9, z + _rng.randf_range(-0.2, 0.2)), _rng.randf() * TAU, 1.2)
 		else:
-			var crate := _mesh_box(Vector3(1.1, 1.1, 1.1), Vector3(x, 1.45, _rng.randf_range(-7, -3)), Color("8a6a3f"))
-			crate.rotation_degrees = Vector3(0, _rng.randf_range(0, 90), 0)
+			_prop("wooden_crate_02", Vector3(x, 0.9, z), _rng.randf() * TAU, 1.5)
+			if _rng.randf() < 0.5:
+				_prop("wooden_crate_01", Vector3(x, 0.9 + 0.68, z), _rng.randf() * TAU, 1.5)
+	# Harbour guns at both ends of the quay, trained on the bay.
+	for cx in [-62.0, 62.0]:
+		_prop("cannon_01", Vector3(cx, 0.9, -7.5), PI, 1.25)
 
 	# The player's ship anchored in the bay.
 	_ship_node = Node3D.new()
 	_ship_node.set_script(ShipVisualScript)
 	add_child(_ship_node)
-	var rank: int = Game.state.ship.spec()["rank"]
-	_ship_len = 18.0 + (8 - rank) * 5.0
+	_ship_len = ShipVisualScript.class_length(Game.state.ship.type_id)
 	_ship_node.build(_ship_len, Color(World.NATIONS[Game.state.character.nation]["color"]), true, Game.state.ship.type_id, Game.state.character.nation)
 	_ship_node.position = ANCHOR_POS
 	_ship_node.rotation_degrees = Vector3(0, ANCHOR_ROT_Y, 0)
@@ -561,16 +558,19 @@ func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof
 		kind: String = "house", title: String = "the house", ui_tab: int = -1) -> void:
 	var wall: Color = wall_c if wall_c.a > 0.0 else WALL_COLORS[_rng.randi_range(0, WALL_COLORS.size() - 1)]
 	var roof: Color = roof_c if roof_c.a > 0.0 else ROOF_COLORS[_rng.randi_range(0, ROOF_COLORS.size() - 1)]
+	if _house_model(pos, size, kind):
+		_finish_house(pos, size, kind, title, ui_tab)
+		return
 
 	var body := _mesh_box(size, pos + Vector3(0, size.y / 2.0, 0), wall)
-	body.material_override.albedo_texture = _noise_tex(0.5, Color(0.9, 0.89, 0.86))
-	body.material_override.uv1_triplanar = true
+	body.material_override = PBR.mat("painted_plaster_wall", 3.0, wall)
 
 	# Timber frame: corner posts + a horizontal beam.
+	var timber := PBR.mat("dark_wooden_planks", 1.5)
 	for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
 		_mesh_box(Vector3(0.28, size.y, 0.28),
-			pos + Vector3(corner.x * size.x / 2.0, size.y / 2.0, corner.z * size.z / 2.0), TIMBER)
-	_mesh_box(Vector3(size.x + 0.1, 0.22, 0.1), pos + Vector3(0, size.y * 0.55, -size.z / 2.0 - 0.06), TIMBER)
+			pos + Vector3(corner.x * size.x / 2.0, size.y / 2.0, corner.z * size.z / 2.0), TIMBER).material_override = timber
+	_mesh_box(Vector3(size.x + 0.1, 0.22, 0.1), pos + Vector3(0, size.y * 0.55, -size.z / 2.0 - 0.06), TIMBER).material_override = timber
 
 	# Roof with overhang + sometimes a chimney.
 	var roof_mesh := MeshInstance3D.new()
@@ -578,15 +578,15 @@ func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof
 	pm.size = Vector3(size.x + 1.4, size.y * 0.55, size.z + 1.4)
 	roof_mesh.mesh = pm
 	roof_mesh.position = pos + Vector3(0, size.y + size.y * 0.275, 0)
-	roof_mesh.material_override = _mat(roof)
+	roof_mesh.material_override = PBR.mat("clay_roof_tiles_02", 2.0, roof.lerp(Color.WHITE, 0.45))
 	add_child(roof_mesh)
 	if _rng.randf() < 0.5:
-		_mesh_box(Vector3(0.8, size.y * 0.8, 0.8), pos + Vector3(size.x * 0.25, size.y + size.y * 0.5, 0), Color("6e6257"))
+		_mesh_box(Vector3(0.8, size.y * 0.8, 0.8), pos + Vector3(size.x * 0.25, size.y + size.y * 0.5, 0), Color("6e6257")).material_override = PBR.mat("plaster_stone_wall_01", 1.5)
 
 	# Door with a frame and a step.
-	_mesh_box(Vector3(1.5, 2.6, 0.12), pos + Vector3(0, 1.3, -size.z / 2.0 - 0.10), TIMBER)
-	_mesh_box(Vector3(1.15, 2.3, 0.16), pos + Vector3(0, 1.15, -size.z / 2.0 - 0.14), Color("5d4024"))
-	_mesh_box(Vector3(2.0, 0.24, 1.0), pos + Vector3(0, 0.12, -size.z / 2.0 - 0.5), Color("8d8577"))
+	_mesh_box(Vector3(1.5, 2.6, 0.12), pos + Vector3(0, 1.3, -size.z / 2.0 - 0.10), TIMBER).material_override = timber
+	_mesh_box(Vector3(1.15, 2.3, 0.16), pos + Vector3(0, 1.15, -size.z / 2.0 - 0.14), Color("5d4024")).material_override = PBR.mat("brown_planks_05", 1.2)
+	_mesh_box(Vector3(2.0, 0.24, 1.0), pos + Vector3(0, 0.12, -size.z / 2.0 - 0.5), Color("8d8577")).material_override = PBR.mat("seaworn_stone_tiles", 1.5)
 
 	# Two windows with white frames and colored shutters.
 	var shutter: Color = [Color("3f6b58"), Color("35405c"), Color("8d3a2e")][_rng.randi_range(0, 2)]
@@ -596,6 +596,11 @@ func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof
 		for sx in [-0.85, 0.85]:
 			_mesh_box(Vector3(0.45, 1.3, 0.08), pos + Vector3(wx + sx, size.y * 0.55, -size.z / 2.0 - 0.09), shutter)
 
+	_finish_house(pos, size, kind, title, ui_tab)
+
+
+## Collider plus the furnished interior behind the front door.
+func _finish_house(pos: Vector3, size: Vector3, kind: String, title: String, ui_tab: int) -> void:
 	_colliders.append(Rect2(pos.x - size.x / 2.0 - 0.6, pos.z - size.z / 2.0 - 0.6, size.x + 1.2, size.z + 1.2))
 
 	# Every building is enterable: the door leads to a furnished room.
@@ -605,6 +610,26 @@ func _house(pos: Vector3, size: Vector3, wall_c: Color = Color.TRANSPARENT, roof
 		"label": "Enter %s" % title,
 		"action": func(): _enter_interior(room),
 	})
+
+
+## A modelled colonial house (Higgsfield → Hunyuan3D, see
+## tools/blender/import_houses.py) fitted to the lot, door to the street.
+## Returns false when the models are missing, so the box house is built.
+func _house_model(pos: Vector3, size: Vector3, kind: String) -> bool:
+	if not ResourceLoader.exists("res://assets/houses/houses.json"):
+		return false
+	if _house_sizes.is_empty():
+		_house_sizes = JSON.parse_string(FileAccess.get_file_as_string("res://assets/houses/houses.json"))
+	var id := "tavern" if kind == "tavern" else ("house_white" if kind in ["governor", "store"] or _rng.randf() < 0.5 else "house_yellow")
+	if not _house_sizes.has(id):
+		id = "house_white"
+	var dims: Dictionary = _house_sizes[id]
+	var k := minf(size.x / float(dims["x"]), size.z / float(dims["z"])) * 1.08
+	var model: Node3D = load("res://assets/houses/%s.gltf" % id).instantiate()
+	model.position = pos
+	model.scale = Vector3.ONE * k
+	add_child(model)
+	return true
 
 
 func _special_building(pos: Vector3, size: Vector3, wall: Color, sign_text: String,
@@ -627,18 +652,19 @@ func _special_building(pos: Vector3, size: Vector3, wall: Color, sign_text: Stri
 func _build_props() -> void:
 	for z in [8.0, 22.0, 36.0, 50.0]:
 		for x in [-7.5, 7.5]:
-			_mesh_cyl(0.09, 0.12, 3.4, Vector3(x, 1.7, z), TIMBER)
+			_mesh_cyl(0.09, 0.12, 3.4, Vector3(x, 1.7, z), TIMBER).material_override = PBR.mat("dark_wooden_planks", 1.0)
+			_prop("wooden_lantern_01", Vector3(x, 3.4, z), 0.0, 1.6)
 			var lamp := MeshInstance3D.new()
 			var lm := SphereMesh.new()
-			lm.radius = 0.24
-			lm.height = 0.48
+			lm.radius = 0.11
+			lm.height = 0.22
 			lamp.mesh = lm
-			lamp.position = Vector3(x, 3.5, z)
+			lamp.position = Vector3(x, 3.75, z)
 			lamp.material_override = _mat(Color(1.0, 0.8, 0.45), true)
 			add_child(lamp)
 
 	# Town well on the square.
-	_mesh_cyl(1.3, 1.4, 1.0, Vector3(-4, 0.5, 16), Color("8d8577"))
+	_mesh_cyl(1.3, 1.4, 1.0, Vector3(-4, 0.5, 16), Color("8d8577")).material_override = PBR.mat("plaster_stone_wall_01", 1.5)
 	_mesh_cyl(0.09, 0.09, 2.2, Vector3(-5.1, 1.9, 16), TIMBER)
 	_mesh_cyl(0.09, 0.09, 2.2, Vector3(-2.9, 1.9, 16), TIMBER)
 	var well_roof := MeshInstance3D.new()
@@ -646,7 +672,7 @@ func _build_props() -> void:
 	wrm.size = Vector3(3.2, 1.0, 2.4)
 	well_roof.mesh = wrm
 	well_roof.position = Vector3(-4, 3.3, 16)
-	well_roof.material_override = _mat(Color("7d3b26"))
+	well_roof.material_override = PBR.mat("clay_roof_tiles_02", 1.5)
 	add_child(well_roof)
 	_colliders.append(Rect2(-5.6, 14.4, 3.2, 3.2))
 

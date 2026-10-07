@@ -6,7 +6,7 @@
 
 An open-source, **built-from-scratch** remake made with **Godot 4.7**, inspired by [Pirates of the Caribbean (2003)](https://en.wikipedia.org/wiki/Pirates_of_the_Caribbean_(video_game)) — known in Russia as *Sea Dogs II* («Корсары 2», Akella). One codebase, every platform: **Windows 10/11, macOS, Linux, and the browser**.
 
-No original game assets are used — all code, game data, and art are made from zero: the sailing ships are modeled procedurally in Blender by a script in this repo, the water is a shader, and the painted backgrounds, sea chart and portraits were generated with [Higgsfield](https://higgsfield.ai).
+No original game assets are used. The ships, props, photo-scanned textures and skies are free CC0 assets from [Poly Haven](https://polyhaven.com); the houses, people, heraldry, painted art and portraits were generated with [Higgsfield](https://higgsfield.ai) and prepared in Blender by scripts in this repo; the music was composed with [Suno](https://suno.com).
 
 ## 🎮 Play now
 
@@ -45,12 +45,12 @@ Direct link: **<a href="https://elkhan-isayev.github.io/corsairs/" target="_blan
 - 📜 **Governor quests** — cargo delivery, pirate hunting, passengers; deadlines and reputation penalties.
 - 🛠️ **Port life** — market, shipyard with 11 ship classes (tartane → man-of-war) and trade-in, crew hiring, repairs.
 - 💾 **Save system** — JSON saves with autosave after every voyage.
-- ⛵ **Ships modeled in Blender, class by class** — `tools/blender/build_ships.py` builds all 11 hull classes at true scale: lofted hulls closing into a clean raked stem with a cutwater, planking with normal maps, copper sheathing and historical liveries painted into their textures, open gunports with red-lined lids and run-out guns, wales and channels, carved stern galleries with quarter galleries and lanterns, catheads with anchors, ship's boats, capstans and wheels, tapered masts with tops and caps, tapered yards, cloth sails with seams and reef bands, jibs, spankers, shrouds with ratlines, stays and backstays. Lateen-rigged tartanes and luggers up to three-deck men-of-war; ambient occlusion baked into every hull; sails furl onto their own yards and stays. Every nation sails under its own cloth — navy French sails with fleurs-de-lis, English crosses, the Spanish Cross of Burgundy, the Dutch lion, black pirate canvas with a skull — and flies its own ensign (heraldry and sailcloth generated with Higgsfield).
+- ⛵ **Detailed period ships** — Poly Haven's 17th-century Dutch ships and pinnace (full PBR hulls, carved sterns, rigging, ratlines), prepared by `tools/blender/import_ships.py`: bow turned forward, sails split so they furl and unfurl, deck profile sampled for crews and boarding, ensign and pennant added. Every nation sails under its own tinted canvas and flies its own ensign (heraldry generated with Higgsfield).
 - 🧍 **Real 3D people** — the captain, sailors, townsmen and townswomen are textured character models generated with Higgsfield and rigged in Blender by `tools/blender/build_people.py`; walking, fencing and deck crews all drive their skeletons.
 - 🎨 **Painted art** — the main menu and port backdrops, an antique parchment sea chart and portraits of the governor, merchant, shipwright and your captain, generated with Higgsfield.
 - 🎵 **Orchestral soundtrack composed with [Suno](https://suno.com)** — an epic main theme for the menu and ports, a driving naval battle score and a sea-shanty voyage tune for the open sea. Towns have no music, only the surf of the harbor (synthesized by `tools/generate_music.gd`).
 - 🎥 **Free orbit camera** in battle — drag with the right mouse button, zoom with the wheel.
-- 🏘️ **Walkable 3D port towns, each one unique** — every island has its own street plan (market plaza, Dutch canal rows, hillside terraces, a ramshackle pirate cove…), its own terrain palette, light and weather (sunny, hazy, overcast with rain) with the surf of the harbor in the air. **Every building is enterable**: furnished tavern, store, shipyard and governor's mansion with NPCs to talk to. All procedural.
+- 🏘️ **Walkable 3D port towns, each one unique** — every island has its own street plan (market plaza, Dutch canal rows, hillside terraces, a ramshackle pirate cove…), light and weather. Colonial houses and the tavern are 3D models generated with Higgsfield (Hunyuan3D); streets, quays, walls and roofs use photo-scanned PBR textures; barrels, sea chests, harbor cannons and lanterns are Poly Haven models; palms are built in Blender. **Every building is enterable**: furnished tavern, store, shipyard and governor's mansion with NPCs to talk to.
 - 🌗 **Day & night cycle** — the sun wheels overhead in towns, at sea and in battle; dawn and dusk burn on the horizon, nights bring moonlight and lantern glow.
 - 🏃 **Living decks** — carriage guns and sailors wandering the deck of every ship.
 - 🕹️ **Arcade sailing** — the wind flavors your speed (±25% at most) but never stalls the ship; battles stay fast.
@@ -128,8 +128,8 @@ core/      game logic — pure, scene-free, fully unit-tested
 tests/     custom headless test framework + unit & smoke tests
 scenes/    main_menu, open_sea (sailable world map), port_town, port, sea (3D battle), boarding
 scripts/   scene scripts + the Game autoload (scene routing)
-assets/    ships & people (glTF from Blender), painted art, water shader, Suno music (MP3), surf ambience (WAV)
-tools/     Blender ship & people builders, screenshot/ship-gallery capture, surf synthesizer
+assets/    ships, props, houses, people (glTF), PBR textures, HDRI skies, art, water shader, music
+tools/     Poly Haven fetcher, Blender import/build scripts, screenshot & ship-gallery capture, surf synthesizer
 docs/      screenshots used by this README
 ```
 
@@ -137,7 +137,8 @@ docs/      screenshots used by this README
 
 - **Logic and presentation are strictly separated.** Scenes are thin: they read state, call core methods, and render. Anything that affects gameplay lives in `core/` and lands with a test.
 - **Determinism first.** Every random roll goes through an injectable `RandomNumberGenerator`, so any battle or trade session can be reproduced from a seed.
-- **No third-party assets or addons.** Ships come from our own Blender script (rebuild with `Blender -b -P tools/blender/build_ships.py`); the test framework is ~80 lines of GDScript.
+- **Free assets, reproducible pipeline.** `python3 tools/fetch_polyhaven.py` downloads the CC0 textures and models; the `tools/blender/*.py` scripts turn them (and the Higgsfield generations) into game-ready glTF. No engine addons; the test framework is ~80 lines of GDScript.
+- **Desktop first.** Native builds use Godot's Forward+ renderer (SSAO, SSIL, HDRI sky lighting, MSAA); the browser build runs the lighter Compatibility renderer.
 
 ## Roadmap
 
